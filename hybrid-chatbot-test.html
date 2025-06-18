@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UMate AI - 하이브리드 챗봇 테스트</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+
+      .container {
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+        width: 100%;
+        max-width: 900px;
+        height: 85vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .header {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        padding: 20px;
+        text-align: center;
+        position: relative;
+      }
+
+      .header h1 {
+        font-size: 26px;
+        margin-bottom: 5px;
+      }
+
+      .header p {
+        opacity: 0.9;
+        font-size: 15px;
+      }
+
+      .hybrid-badge {
+        position: absolute;
+        top: 10px;
+        left: 20px;
+        background: rgba(255, 255, 255, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 20px;
+        padding: 5px 12px;
+        font-size: 11px;
+        font-weight: bold;
+      }
+
+      .status {
+        position: absolute;
+        top: 15px;
+        right: 20px;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: bold;
+      }
+
+      .status.connected {
+        background: rgba(34, 197, 94, 0.2);
+        border: 1px solid rgba(34, 197, 94, 0.5);
+        color: #16a34a;
+      }
+
+      .status.disconnected {
+        background: rgba(239, 68, 68, 0.2);
+        border: 1px solid rgba(239, 68, 68, 0.5);
+        color: #dc2626;
+      }
+
+      .chat-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        background: #f8fafc;
+      }
+
+      .hybrid-info {
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        color: white;
+        padding: 12px;
+        margin-bottom: 15px;
+        border-radius: 12px;
+        font-size: 13px;
+        text-align: center;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+      }
+
+      .data-types {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 15px;
+        flex-wrap: wrap;
+      }
+
+      .data-type {
+        flex: 1;
+        min-width: 120px;
+        padding: 8px 12px;
+        border-radius: 10px;
+        font-size: 11px;
+        text-align: center;
+        border: 1px solid #e5e7eb;
+      }
+
+      .data-type.static {
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+        border-color: #10b981;
+      }
+
+      .data-type.dynamic {
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        color: white;
+        border-color: #f59e0b;
+      }
+
+      .quick-questions {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 8px;
+        margin-bottom: 15px;
+      }
+
+      .quick-question {
+        background: #f3f4f6;
+        border: 1px solid #d1d5db;
+        border-radius: 12px;
+        padding: 8px 12px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-align: center;
+      }
+
+      .quick-question:hover {
+        background: #e5e7eb;
+        transform: translateY(-1px);
+      }
+
+      .quick-question.static-example {
+        border-color: #10b981;
+        background: rgba(16, 185, 129, 0.1);
+      }
+
+      .quick-question.dynamic-example {
+        border-color: #f59e0b;
+        background: rgba(245, 158, 11, 0.1);
+      }
+
+      .message {
+        margin-bottom: 15px;
+        display: flex;
+        animation: fadeIn 0.3s ease-in;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .message.user {
+        justify-content: flex-end;
+      }
+
+      .message-content {
+        max-width: 75%;
+        padding: 12px 16px;
+        border-radius: 18px;
+        font-size: 14px;
+        line-height: 1.5;
+        position: relative;
+      }
+
+      .user .message-content {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+      }
+
+      .bot .message-content {
+        background: white;
+        color: #374151;
+        border: 1px solid #e5e7eb;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      .message-info {
+        font-size: 11px;
+        opacity: 0.7;
+        margin-top: 5px;
+      }
+
+      .input-container {
+        padding: 20px;
+        background: white;
+        border-top: 1px solid #e5e7eb;
+      }
+
+      .controls {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 15px;
+        flex-wrap: wrap;
+      }
+
+      .control-btn {
+        padding: 8px 16px;
+        border: 1px solid #d1d5db;
+        border-radius: 20px;
+        background: white;
+        cursor: pointer;
+        font-size: 12px;
+        transition: all 0.2s;
+      }
+
+      .control-btn:hover {
+        background: #f3f4f6;
+      }
+
+      .control-btn.active {
+        background: #667eea;
+        color: white;
+        border-color: #667eea;
+      }
+
+      .input-wrapper {
+        display: flex;
+        gap: 10px;
+        align-items: flex-end;
+      }
+
+      #messageInput {
+        flex: 1;
+        padding: 12px 16px;
+        border: 2px solid #e5e7eb;
+        border-radius: 25px;
+        font-size: 14px;
+        resize: none;
+        min-height: 44px;
+        max-height: 120px;
+        font-family: inherit;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+
+      #messageInput:focus {
+        border-color: #667eea;
+      }
+
+      .send-btn {
+        width: 44px;
+        height: 44px;
+        border: none;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+        font-size: 16px;
+      }
+
+      .send-btn:hover {
+        transform: scale(1.05);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      }
+
+      .send-btn:disabled {
+        background: #9ca3af;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+
+      .system-status {
+        display: flex;
+        gap: 15px;
+        padding: 10px;
+        background: #f8fafc;
+        border-radius: 10px;
+        margin-bottom: 15px;
+        font-size: 11px;
+      }
+
+      .status-item {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+
+      .status-indicator {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+      }
+
+      .status-indicator.active {
+        background: #22c55e;
+      }
+
+      .status-indicator.inactive {
+        background: #ef4444;
+      }
+
+      @media (max-width: 768px) {
+        .container {
+          height: 100vh;
+          border-radius: 0;
+        }
+
+        .message-content {
+          max-width: 85%;
+        }
+
+        .quick-questions {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div class="hybrid-badge">HYBRID MODE</div>
+        <h1>🎓 UMate AI Assistant</h1>
+        <p>하이브리드 모드 - 정적 지식베이스 + 동적 실시간 검색</p>
+        <div class="status disconnected" id="status">연결 중...</div>
+      </div>
+
+      <div class="chat-container">
+        <div class="messages" id="messages">
+          <div class="hybrid-info">
+            ⚡ 하이브리드 모드: 기본 정보(빠른 응답) + 최신 정보(실시간 검색)
+          </div>
+
+          <div class="data-types">
+            <div class="data-type static">
+              📚 정적 데이터<br />
+              <small>기본 서비스, FAQ, 연락처</small>
+            </div>
+            <div class="data-type dynamic">
+              📅 동적 데이터<br />
+              <small>메뉴, 일정, 최신 공지</small>
+            </div>
+          </div>
+
+          <div class="system-status" id="systemStatus">
+            <div class="status-item">
+              <div class="status-indicator inactive" id="staticIndicator"></div>
+              <span>정적 지식베이스</span>
+            </div>
+            <div class="status-item">
+              <div
+                class="status-indicator inactive"
+                id="dynamicIndicator"
+              ></div>
+              <span>동적 검색</span>
+            </div>
+            <div class="status-item">
+              <div class="status-indicator inactive" id="dbIndicator"></div>
+              <span>데이터베이스</span>
+            </div>
+          </div>
+
+          <div class="quick-questions">
+            <div
+              class="quick-question static-example"
+              onclick="sendQuickMessage('도서관 이용 방법을 알려주세요')"
+            >
+              📚 도서관 이용방법 (정적)
+            </div>
+            <div
+              class="quick-question static-example"
+              onclick="sendQuickMessage('장학금 신청 절차가 궁금해요')"
+            >
+              💰 장학금 신청절차 (정적)
+            </div>
+            <div
+              class="quick-question dynamic-example"
+              onclick="sendQuickMessage('오늘 학생식당 메뉴 뭐예요?')"
+            >
+              🍽️ 오늘 식당메뉴 (동적)
+            </div>
+            <div
+              class="quick-question dynamic-example"
+              onclick="sendQuickMessage('최근 공지사항 알려주세요')"
+            >
+              📢 최신 공지사항 (동적)
+            </div>
+            <div
+              class="quick-question static-example"
+              onclick="sendQuickMessage('기숙사 입주 조건이 뭐가 있나요?')"
+            >
+              🏠 기숙사 입주조건 (정적)
+            </div>
+            <div
+              class="quick-question dynamic-example"
+              onclick="sendQuickMessage('이번 달 학사일정 확인하고 싶어요')"
+            >
+              📅 이번달 일정 (동적)
+            </div>
+          </div>
+
+          <div class="controls">
+            <button class="control-btn" onclick="testHybridStatus()">
+              하이브리드 상태
+            </button>
+            <button class="control-btn" onclick="testDynamicSearch()">
+              동적 검색 테스트
+            </button>
+            <button class="control-btn" onclick="refreshKnowledge()">
+              지식베이스 새로고침
+            </button>
+            <button class="control-btn" onclick="clearChat()">
+              대화 초기화
+            </button>
+            <select id="voiceSelect" class="control-btn">
+              <option value="alloy">Alloy (기본)</option>
+              <option value="echo">Echo</option>
+              <option value="fable">Fable</option>
+              <option value="onyx">Onyx</option>
+              <option value="nova">Nova</option>
+              <option value="shimmer">Shimmer</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="input-container">
+          <div class="input-wrapper">
+            <textarea
+              id="messageInput"
+              placeholder="정적 정보와 최신 정보를 함께 검색해드립니다... (예: 도서관 이용시간, 오늘 메뉴, 최신 공지 등)"
+              rows="1"
+            ></textarea>
+            <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+              ➤
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let socket = null;
+      let isConnected = false;
+      let currentAudio = null;
+      let audioContext = null;
+
+      // 웹소켓 연결
+      function connectWebSocket() {
+        const wsUrl = "ws://localhost:3005/ws/realtime-chat";
+        console.log("하이브리드 웹소켓 연결 시도:", wsUrl);
+
+        socket = new WebSocket(wsUrl);
+
+        socket.onopen = function (event) {
+          console.log("하이브리드 웹소켓 연결됨");
+          updateStatus("connected", "🟢 하이브리드 활성");
+          isConnected = true;
+          updateSystemStatus();
+
+          addMessage(
+            "bot",
+            "안녕하세요! 저는 하이브리드 UMate AI입니다. 정적 지식베이스와 실시간 검색을 함께 활용하여 가장 정확하고 최신의 정보를 제공해드립니다!",
+            "하이브리드 시스템"
+          );
+        };
+
+        socket.onmessage = function (event) {
+          const data = JSON.parse(event.data);
+          console.log("받은 메시지:", data);
+
+          switch (data.type) {
+            case "connection":
+              if (data.status === "connected") {
+                console.log("하이브리드 연결 확인:", data.capabilities);
+                updateSystemStatus(true);
+              }
+              break;
+
+            case "text_delta":
+              updateBotMessage(data.delta);
+              break;
+
+            case "text_done":
+              finalizeBotMessage(data.text);
+              break;
+
+            case "speech_started":
+              addMessage("system", data.message);
+              break;
+
+            case "speech_stopped":
+              addMessage("system", data.message);
+              break;
+
+            case "assistant_message_start":
+              startBotMessage(data.message);
+              break;
+
+            case "response_complete":
+              console.log("하이브리드 응답 완료");
+              break;
+
+            case "error":
+              addMessage("system", "❌ 오류: " + data.error);
+              break;
+
+            default:
+              console.log("처리되지 않은 메시지 타입:", data.type);
+          }
+        };
+
+        socket.onclose = function (event) {
+          console.log("하이브리드 웹소켓 연결 종료");
+          updateStatus("disconnected", "🔴 연결 끊김");
+          isConnected = false;
+          updateSystemStatus(false);
+
+          // 자동 재연결 시도
+          setTimeout(() => {
+            if (!isConnected) {
+              connectWebSocket();
+            }
+          }, 5000);
+        };
+
+        socket.onerror = function (error) {
+          console.error("하이브리드 웹소켓 오류:", error);
+          updateStatus("disconnected", "🔴 연결 오류");
+          isConnected = false;
+          updateSystemStatus(false);
+        };
+      }
+
+      // 시스템 상태 업데이트
+      function updateSystemStatus(connected = false) {
+        const staticIndicator = document.getElementById("staticIndicator");
+        const dynamicIndicator = document.getElementById("dynamicIndicator");
+        const dbIndicator = document.getElementById("dbIndicator");
+
+        if (connected) {
+          staticIndicator.className = "status-indicator active";
+          dynamicIndicator.className = "status-indicator active";
+          dbIndicator.className = "status-indicator active";
+        } else {
+          staticIndicator.className = "status-indicator inactive";
+          dynamicIndicator.className = "status-indicator inactive";
+          dbIndicator.className = "status-indicator inactive";
+        }
+      }
+
+      // 상태 업데이트
+      function updateStatus(status, text) {
+        const statusEl = document.getElementById("status");
+        statusEl.className = `status ${status}`;
+        statusEl.textContent = text;
+      }
+
+      // 메시지 전송
+      function sendMessage() {
+        const input = document.getElementById("messageInput");
+        const message = input.value.trim();
+
+        if (!message || !isConnected) return;
+
+        addMessage("user", message);
+        input.value = "";
+        input.style.height = "auto";
+
+        // 웹소켓으로 메시지 전송
+        socket.send(
+          JSON.stringify({
+            type: "user_message",
+            message: message,
+          })
+        );
+      }
+
+      // 빠른 질문 전송
+      function sendQuickMessage(message) {
+        if (!isConnected) return;
+
+        addMessage("user", message);
+
+        socket.send(
+          JSON.stringify({
+            type: "user_message",
+            message: message,
+          })
+        );
+      }
+
+      // 메시지 추가
+      function addMessage(type, content, info = "") {
+        const messagesContainer = document.getElementById("messages");
+        const messageDiv = document.createElement("div");
+        messageDiv.className = `message ${type}`;
+
+        const contentDiv = document.createElement("div");
+        contentDiv.className = "message-content";
+        contentDiv.textContent = content;
+
+        if (info) {
+          const infoDiv = document.createElement("div");
+          infoDiv.className = "message-info";
+          infoDiv.textContent = info;
+          contentDiv.appendChild(infoDiv);
+        }
+
+        messageDiv.appendChild(contentDiv);
+        messagesContainer.appendChild(messageDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      }
+
+      let currentBotMessageDiv = null;
+
+      // 봇 메시지 시작
+      function startBotMessage(initialText = "") {
+        const messagesContainer = document.getElementById("messages");
+
+        const messageDiv = document.createElement("div");
+        messageDiv.className = "message bot";
+
+        const contentDiv = document.createElement("div");
+        contentDiv.className = "message-content";
+        contentDiv.textContent = initialText;
+
+        messageDiv.appendChild(contentDiv);
+        messagesContainer.appendChild(messageDiv);
+
+        currentBotMessageDiv = contentDiv;
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      }
+
+      // 봇 메시지 업데이트
+      function updateBotMessage(delta) {
+        if (!currentBotMessageDiv) {
+          startBotMessage();
+        }
+
+        currentBotMessageDiv.textContent += delta;
+        document.getElementById("messages").scrollTop =
+          document.getElementById("messages").scrollHeight;
+      }
+
+      // 봇 메시지 완료
+      function finalizeBotMessage(finalText) {
+        if (currentBotMessageDiv && finalText) {
+          currentBotMessageDiv.textContent = finalText;
+        }
+        currentBotMessageDiv = null;
+      }
+
+      // 하이브리드 상태 테스트
+      function testHybridStatus() {
+        fetch("http://localhost:3005/api/hybrid/status")
+          .then((response) => response.json())
+          .then((data) => {
+            const status = `✅ 하이브리드 시스템 상태:
+📚 정적 지식베이스: ${data.static_loaded ? "로드됨" : "로드 안됨"} (${
+              data.static_size
+            }자)
+🔍 동적 검색: ${data.dynamic_search ? "활성" : "비활성"}
+👥 활성 연결: ${data.active_connections}개
+⚡ 기능: 정적지식베이스, 동적검색, 개인화, 음성지원, 실시간`;
+            addMessage("system", status);
+          })
+          .catch((error) => {
+            addMessage(
+              "system",
+              "❌ 하이브리드 상태 확인 실패: " + error.message
+            );
+          });
+      }
+
+      // 동적 검색 테스트
+      function testDynamicSearch() {
+        fetch("http://localhost:3005/api/services/dynamic?q=메뉴")
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.success) {
+              addMessage(
+                "system",
+                `✅ 동적 검색 성공! "${data.query}" 관련 ${data.count}개 최신 정보 발견`
+              );
+            } else {
+              addMessage("system", "❌ 동적 검색 실패: " + data.error);
+            }
+          })
+          .catch((error) => {
+            addMessage("system", "❌ 동적 검색 테스트 실패: " + error.message);
+          });
+      }
+
+      // 지식베이스 새로고침
+      function refreshKnowledge() {
+        fetch("http://localhost:3005/api/knowledge/refresh", { method: "POST" })
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.success) {
+              addMessage("system", "✅ 정적 지식베이스가 새로고침되었습니다.");
+            } else {
+              addMessage(
+                "system",
+                "❌ 지식베이스 새로고침 실패: " + data.error
+              );
+            }
+          })
+          .catch((error) => {
+            addMessage(
+              "system",
+              "❌ 지식베이스 새로고침 실패: " + error.message
+            );
+          });
+      }
+
+      // 대화 초기화
+      function clearChat() {
+        const messages = document.getElementById("messages");
+        const systemElements = messages.querySelectorAll(
+          ".hybrid-info, .data-types, .system-status, .quick-questions, .controls"
+        );
+        messages.innerHTML = "";
+
+        // 시스템 요소들 다시 추가
+        systemElements.forEach((el) => messages.appendChild(el));
+
+        addMessage(
+          "bot",
+          "대화가 초기화되었습니다. 하이브리드 모드로 다시 질문해주세요!",
+          "하이브리드 시스템"
+        );
+      }
+
+      // 음성 변경
+      document
+        .getElementById("voiceSelect")
+        .addEventListener("change", function () {
+          if (isConnected) {
+            socket.send(
+              JSON.stringify({
+                type: "voice_change",
+                voice: this.value,
+              })
+            );
+            addMessage("system", `음성이 ${this.value}로 변경되었습니다.`);
+          }
+        });
+
+      // 입력창 자동 크기 조절
+      document
+        .getElementById("messageInput")
+        .addEventListener("input", function () {
+          this.style.height = "auto";
+          this.style.height = Math.min(this.scrollHeight, 120) + "px";
+        });
+
+      // 엔터키로 전송
+      document
+        .getElementById("messageInput")
+        .addEventListener("keypress", function (e) {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+          }
+        });
+
+      // 페이지 로드 시 연결
+      window.addEventListener("load", function () {
+        connectWebSocket();
+      });
+    </script>
+  </body>
+</html>

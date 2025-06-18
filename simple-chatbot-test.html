@@ -1,0 +1,1332 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UMate AI - 순수 챗봇 테스트</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #4f46e5, #7c3aed);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+
+      .container {
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
+        width: 100%;
+        max-width: 800px;
+        height: 85vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .header {
+        background: linear-gradient(135deg, #4f46e5, #7c3aed);
+        color: white;
+        padding: 25px;
+        text-align: center;
+        position: relative;
+      }
+
+      .header h1 {
+        font-size: 28px;
+        margin-bottom: 8px;
+        font-weight: 700;
+      }
+
+      .header p {
+        opacity: 0.9;
+        font-size: 16px;
+      }
+
+      .pure-badge {
+        position: absolute;
+        top: 12px;
+        left: 20px;
+        background: rgba(255, 255, 255, 0.25);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 20px;
+        padding: 6px 14px;
+        font-size: 11px;
+        font-weight: bold;
+      }
+
+      .status {
+        position: absolute;
+        top: 18px;
+        right: 20px;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: bold;
+      }
+
+      .status.connected {
+        background: rgba(34, 197, 94, 0.25);
+        border: 1px solid rgba(34, 197, 94, 0.4);
+        color: #16a34a;
+      }
+
+      .status.disconnected {
+        background: rgba(239, 68, 68, 0.25);
+        border: 1px solid rgba(239, 68, 68, 0.4);
+        color: #dc2626;
+      }
+
+      .chat-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 25px;
+        background: #f8fafc;
+      }
+
+      .welcome-section {
+        background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+        color: white;
+        padding: 20px;
+        margin-bottom: 20px;
+        border-radius: 15px;
+        text-align: center;
+        box-shadow: 0 8px 25px rgba(59, 130, 246, 0.3);
+      }
+
+      .welcome-section h3 {
+        margin-bottom: 10px;
+        font-size: 18px;
+      }
+
+      .features {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 15px;
+        margin-bottom: 20px;
+      }
+
+      .feature-card {
+        background: white;
+        padding: 15px;
+        border-radius: 12px;
+        text-align: center;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        border: 1px solid #e5e7eb;
+        transition: transform 0.2s;
+      }
+
+      .feature-card:hover {
+        transform: translateY(-2px);
+      }
+
+      .feature-card h4 {
+        color: #4f46e5;
+        margin-bottom: 5px;
+        font-size: 14px;
+      }
+
+      .feature-card p {
+        color: #6b7280;
+        font-size: 12px;
+      }
+
+      .quick-examples {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+
+      .example-btn {
+        background: #f3f4f6;
+        border: 1px solid #d1d5db;
+        border-radius: 12px;
+        padding: 12px 16px;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-align: center;
+      }
+
+      .example-btn:hover {
+        background: #e5e7eb;
+        transform: translateY(-1px);
+      }
+
+      .message {
+        margin-bottom: 20px;
+        display: flex;
+        animation: slideIn 0.4s ease-out;
+      }
+
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .message.user {
+        justify-content: flex-end;
+      }
+
+      .message-content {
+        max-width: 75%;
+        padding: 15px 20px;
+        border-radius: 20px;
+        font-size: 15px;
+        line-height: 1.6;
+        position: relative;
+      }
+
+      .user .message-content {
+        background: linear-gradient(135deg, #4f46e5, #7c3aed);
+        color: white;
+        box-shadow: 0 4px 15px rgba(79, 70, 229, 0.3);
+      }
+
+      .bot .message-content {
+        background: white;
+        color: #374151;
+        border: 1px solid #e5e7eb;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      }
+
+      .system .message-content {
+        background: #fef3c7;
+        color: #92400e;
+        border: 1px solid #fbbf24;
+        font-size: 13px;
+        max-width: 90%;
+        margin: 0 auto;
+      }
+
+      .typing-indicator {
+        display: flex;
+        align-items: center;
+        padding: 15px 20px;
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 20px;
+        max-width: 75%;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      }
+
+      .typing-dots {
+        display: flex;
+        gap: 6px;
+        margin-right: 10px;
+      }
+
+      .typing-dots span {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #9ca3af;
+        animation: typing 1.6s infinite ease-in-out;
+      }
+
+      .typing-dots span:nth-child(1) {
+        animation-delay: -0.32s;
+      }
+      .typing-dots span:nth-child(2) {
+        animation-delay: -0.16s;
+      }
+
+      @keyframes typing {
+        0%,
+        80%,
+        100% {
+          transform: scale(0.8);
+          opacity: 0.5;
+        }
+        40% {
+          transform: scale(1.2);
+          opacity: 1;
+        }
+      }
+
+      .controls {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+      }
+
+      .control-btn {
+        padding: 8px 16px;
+        border: 1px solid #d1d5db;
+        border-radius: 20px;
+        background: white;
+        cursor: pointer;
+        font-size: 12px;
+        transition: all 0.2s;
+      }
+
+      .control-btn:hover {
+        background: #f3f4f6;
+        transform: translateY(-1px);
+      }
+
+      .control-btn.active {
+        background: #4f46e5;
+        color: white;
+        border-color: #4f46e5;
+      }
+
+      .input-container {
+        padding: 25px;
+        background: white;
+        border-top: 1px solid #e5e7eb;
+      }
+
+      .input-wrapper {
+        display: flex;
+        gap: 12px;
+        align-items: flex-end;
+      }
+
+      #messageInput {
+        flex: 1;
+        padding: 15px 20px;
+        border: 2px solid #e5e7eb;
+        border-radius: 25px;
+        font-size: 15px;
+        resize: none;
+        min-height: 50px;
+        max-height: 120px;
+        font-family: inherit;
+        outline: none;
+        transition: border-color 0.3s;
+      }
+
+      #messageInput:focus {
+        border-color: #4f46e5;
+        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+      }
+
+      .send-btn {
+        width: 50px;
+        height: 50px;
+        border: none;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #4f46e5, #7c3aed);
+        color: white;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s;
+        font-size: 18px;
+        box-shadow: 0 4px 15px rgba(79, 70, 229, 0.4);
+      }
+
+      .send-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 6px 20px rgba(79, 70, 229, 0.5);
+      }
+
+      .send-btn:disabled {
+        background: #9ca3af;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+
+      .voice-controls {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 15px;
+      }
+
+      .voice-btn {
+        padding: 8px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 20px;
+        background: white;
+        cursor: pointer;
+        font-size: 12px;
+        transition: all 0.2s;
+      }
+
+      .voice-btn.recording {
+        background: #ef4444;
+        color: white;
+        border-color: #ef4444;
+      }
+
+      .connection-info {
+        background: #f0f9ff;
+        border: 1px solid #bae6fd;
+        border-radius: 10px;
+        padding: 12px;
+        margin-bottom: 15px;
+        font-size: 12px;
+        color: #0369a1;
+      }
+
+      @media (max-width: 768px) {
+        .container {
+          height: 100vh;
+          border-radius: 0;
+        }
+
+        .header {
+          padding: 20px;
+        }
+
+        .header h1 {
+          font-size: 24px;
+        }
+
+        .message-content {
+          max-width: 85%;
+        }
+
+        .features {
+          grid-template-columns: 1fr;
+        }
+
+        .quick-examples {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div class="pure-badge">PURE CHATBOT</div>
+        <h1>🤖 UMate AI Assistant</h1>
+        <p>순수 챗봇 모드 - OpenAI API 직접 연결</p>
+        <div class="status disconnected" id="status">연결 중...</div>
+      </div>
+
+      <div class="chat-container">
+        <div class="messages" id="messages">
+          <div class="welcome-section">
+            <h3>🚀 순수 챗봇 모드</h3>
+            <p>데이터베이스 없이 OpenAI GPT-4o mini와 직접 대화하세요!</p>
+          </div>
+
+          <div class="features">
+            <div class="feature-card">
+              <h4>⚡ 실시간 스트리밍</h4>
+              <p>타이핑하듯 답변 생성</p>
+            </div>
+            <div class="feature-card">
+              <h4>🎤 음성 지원</h4>
+              <p>말하기 & 듣기 가능</p>
+            </div>
+            <div class="feature-card">
+              <h4>🧠 GPT-4o mini</h4>
+              <p>최신 AI 모델 사용</p>
+            </div>
+            <div class="feature-card">
+              <h4>💬 자연스러운 대화</h4>
+              <p>한국어 완벽 지원</p>
+            </div>
+          </div>
+
+          <div class="connection-info" id="connectionInfo">
+            📡 WebSocket 연결 대기 중... 포트 3000에서 chatbot.js가 실행 중인지
+            확인해주세요.
+          </div>
+
+          <div class="quick-examples">
+            <div
+              class="example-btn"
+              onclick="sendExample('안녕하세요! 자기소개 해주세요')"
+            >
+              👋 인사 & 소개
+            </div>
+            <div
+              class="example-btn"
+              onclick="sendExample('오늘 날씨가 어떤가요?')"
+            >
+              🌤️ 일반 질문
+            </div>
+            <div
+              class="example-btn"
+              onclick="sendExample('간단한 시를 하나 써주세요')"
+            >
+              ✍️ 창작 요청
+            </div>
+            <div
+              class="example-btn"
+              onclick="sendExample('프로그래밍 공부 방법 추천해주세요')"
+            >
+              💻 학습 조언
+            </div>
+            <div
+              class="example-btn"
+              onclick="sendExample('재미있는 농담 하나 해주세요')"
+            >
+              😄 농담 요청
+            </div>
+            <div
+              class="example-btn"
+              onclick="sendExample('간단한 수학 문제 내주세요')"
+            >
+              🔢 수학 문제
+            </div>
+          </div>
+
+          <div class="controls">
+            <button class="control-btn" onclick="testConnection()">
+              연결 테스트
+            </button>
+            <button class="control-btn" onclick="resetConnection()">
+              연결 초기화
+            </button>
+            <button class="control-btn" onclick="clearChat()">
+              대화 초기화
+            </button>
+            <button
+              class="control-btn"
+              onclick="toggleVoiceMode()"
+              id="voiceModeBtn"
+            >
+              음성 모드 OFF
+            </button>
+            <select id="voiceSelect" class="control-btn">
+              <option value="alloy">Alloy (기본)</option>
+              <option value="echo">Echo</option>
+              <option value="fable">Fable</option>
+              <option value="onyx">Onyx</option>
+              <option value="nova">Nova</option>
+              <option value="shimmer">Shimmer</option>
+            </select>
+          </div>
+
+          <div class="voice-controls" style="display: none" id="voiceControls">
+            <button
+              class="voice-btn"
+              id="recordBtn"
+              onclick="toggleRecording()"
+            >
+              🎤 녹음 시작
+            </button>
+            <span id="recordingStatus"
+              >음성 모드가 활성화되면 음성으로 대화할 수 있습니다.</span
+            >
+          </div>
+        </div>
+
+        <div class="input-container">
+          <div class="input-wrapper">
+            <textarea
+              id="messageInput"
+              placeholder="무엇이든 물어보세요... (예: 안녕하세요, 도움이 필요해요)"
+              rows="1"
+            ></textarea>
+            <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+              ➤
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let socket = null;
+      let isConnected = false;
+      let voiceMode = false;
+      let isRecording = false;
+      let currentBotMessageDiv = null;
+      let audioContext = null;
+      let mediaRecorder = null;
+      let audioChunks = [];
+      let reconnectAttempts = 0;
+      let maxReconnectAttempts = 5;
+      let reconnectTimer = null;
+      let connectionStable = false;
+
+      // 웹소켓 연결
+      function connectWebSocket() {
+        // 이미 연결되어 있으면 새로 연결하지 않음
+        if (isConnected && socket && socket.readyState === WebSocket.OPEN) {
+          console.log("이미 안정적으로 연결되어 있음");
+          return;
+        }
+
+        // 기존 소켓이 있으면 정리
+        if (socket) {
+          socket.onopen = null;
+          socket.onmessage = null;
+          socket.onclose = null;
+          socket.onerror = null;
+          if (
+            socket.readyState === WebSocket.OPEN ||
+            socket.readyState === WebSocket.CONNECTING
+          ) {
+            socket.close();
+          }
+        }
+
+        const wsUrl = "ws://localhost:3000/realtime-chat";
+        console.log(
+          `순수 챗봇 웹소켓 연결 시도 (${
+            reconnectAttempts + 1
+          }/${maxReconnectAttempts}):`,
+          wsUrl
+        );
+
+        socket = new WebSocket(wsUrl);
+
+        socket.onopen = function (event) {
+          console.log("순수 챗봇 연결 성공! 🎉");
+          updateStatus("connected", "🟢 연결 안정");
+          updateConnectionInfo(
+            "✅ 순수 챗봇 모드로 안정적으로 연결되었습니다! 자유롭게 대화해보세요."
+          );
+          isConnected = true;
+          connectionStable = true;
+          reconnectAttempts = 0;
+
+          // 재연결 타이머가 있으면 제거
+          if (reconnectTimer) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+          }
+
+          // 첫 연결시에만 환영 메시지 표시
+          if (!connectionStable || reconnectAttempts === 0) {
+            addMessage(
+              "bot",
+              "안녕하세요! 저는 UMate AI입니다. 데이터베이스 없이 순수한 AI와의 대화를 즐기실 수 있습니다. 무엇을 도와드릴까요? 🤖",
+              "AI 어시스턴트"
+            );
+          } else {
+            addMessage(
+              "system",
+              "🔄 연결이 복구되었습니다. 대화를 계속해주세요!"
+            );
+          }
+        };
+
+        socket.onmessage = function (event) {
+          const data = JSON.parse(event.data);
+          console.log("📨 서버로부터 메시지 수신:", data);
+
+          switch (data.type) {
+            case "connection":
+              if (data.status === "connected") {
+                console.log("연결 확인:", data.capabilities);
+                if (data.capabilities && data.capabilities.audio) {
+                  document.getElementById("voiceModeBtn").style.display =
+                    "inline-block";
+                }
+              }
+              break;
+
+            case "text_delta":
+              updateBotMessage(data.delta);
+              break;
+
+            case "text_done":
+              finalizeBotMessage(data.text);
+              break;
+
+            case "chat_response":
+              // 간단한 Chat API 응답 처리
+              addMessage("bot", data.message);
+              break;
+
+            case "audio_delta":
+              if (voiceMode && data.audio) {
+                playAudioDelta(data.audio);
+              }
+              break;
+
+            case "audio_transcript_delta":
+              updateBotMessage(data.delta);
+              break;
+
+            case "audio_transcript_done":
+              finalizeBotMessage(data.transcript);
+              break;
+
+            case "speech_started":
+              addMessage("system", data.message);
+              break;
+
+            case "speech_stopped":
+              addMessage("system", data.message);
+              break;
+
+            case "transcription_complete":
+              addMessage("user", data.transcription, "음성 인식");
+              break;
+
+            case "assistant_message_start":
+              startBotMessage(data.message);
+              break;
+
+            case "response_complete":
+              console.log("응답 완료");
+              break;
+
+            case "error":
+              addMessage("system", "❌ 오류: " + data.error);
+              break;
+
+            default:
+              console.log("처리되지 않은 메시지 타입:", data.type);
+          }
+        };
+
+        socket.onclose = function (event) {
+          console.log("순수 챗봇 연결 종료", event.code, event.reason);
+          isConnected = false;
+          connectionStable = false;
+
+          // 정상 종료(1000)이거나 최대 재연결 시도 횟수를 초과한 경우 재연결하지 않음
+          if (
+            event.code === 1000 ||
+            reconnectAttempts >= maxReconnectAttempts
+          ) {
+            updateStatus("disconnected", "🔴 연결 종료");
+            updateConnectionInfo(
+              event.code === 1000
+                ? "연결이 정상적으로 종료되었습니다."
+                : "최대 재연결 시도 횟수를 초과했습니다. 새로고침 후 다시 시도해주세요."
+            );
+            return;
+          }
+
+          reconnectAttempts++;
+          const delay = Math.min(5000 * reconnectAttempts, 30000); // 최대 30초까지 지연
+
+          updateStatus("disconnected", "🔄 재연결 중...");
+          updateConnectionInfo(
+            `❌ 연결이 끊어졌습니다. ${
+              delay / 1000
+            }초 후 재연결을 시도합니다... (${reconnectAttempts}/${maxReconnectAttempts})`
+          );
+
+          // 이전 타이머가 있으면 제거
+          if (reconnectTimer) {
+            clearTimeout(reconnectTimer);
+          }
+
+          // 지연 후 재연결 시도
+          reconnectTimer = setTimeout(() => {
+            if (!isConnected && reconnectAttempts <= maxReconnectAttempts) {
+              connectWebSocket();
+            }
+          }, delay);
+        };
+
+        socket.onerror = function (error) {
+          console.error("순수 챗봇 웹소켓 오류:", error);
+          updateStatus("disconnected", "🔴 연결 오류");
+          updateConnectionInfo(
+            "❌ 연결 오류가 발생했습니다. chatbot.js가 포트 3000에서 실행 중인지 확인해주세요."
+          );
+          isConnected = false;
+          connectionStable = false;
+        };
+      }
+
+      // 상태 업데이트
+      function updateStatus(status, text) {
+        const statusEl = document.getElementById("status");
+        statusEl.className = `status ${status}`;
+        statusEl.textContent = text;
+      }
+
+      // 연결 정보 업데이트
+      function updateConnectionInfo(message) {
+        const infoEl = document.getElementById("connectionInfo");
+        infoEl.textContent = message;
+      }
+
+      // 메시지 전송
+      function sendMessage() {
+        const input = document.getElementById("messageInput");
+        const message = input.value.trim();
+
+        console.log("🔍 sendMessage 호출됨");
+        console.log("📝 메시지:", message);
+        console.log("🔗 연결 상태:", isConnected);
+        console.log("🌐 소켓 상태:", socket ? socket.readyState : "소켓 없음");
+
+        if (!message) {
+          console.log("❌ 메시지가 비어있음");
+          return;
+        }
+
+        if (!isConnected) {
+          console.log("❌ 연결되지 않음");
+          addMessage(
+            "system",
+            "❌ 서버에 연결되지 않았습니다. 연결을 확인해주세요."
+          );
+          return;
+        }
+
+        if (!socket || socket.readyState !== WebSocket.OPEN) {
+          console.log("❌ 소켓이 열려있지 않음");
+          addMessage(
+            "system",
+            "❌ WebSocket 연결이 끊어졌습니다. 재연결을 시도해주세요."
+          );
+          return;
+        }
+
+        console.log("✅ 메시지 전송 시작");
+        addMessage("user", message);
+        input.value = "";
+        input.style.height = "auto";
+
+        try {
+          // 웹소켓으로 메시지 전송
+          const messageData = {
+            type: "user_message",
+            message: message,
+          };
+          console.log("📤 전송할 데이터:", messageData);
+
+          socket.send(JSON.stringify(messageData));
+          console.log("✅ 메시지 전송 완료");
+
+          // 전송 후 소켓 상태 재확인
+          setTimeout(() => {
+            console.log("🔍 전송 후 소켓 상태:", socket.readyState);
+            console.log("🔍 전송 후 연결 상태:", isConnected);
+          }, 100);
+        } catch (error) {
+          console.error("❌ 메시지 전송 오류:", error);
+          addMessage(
+            "system",
+            "❌ 메시지 전송 중 오류가 발생했습니다: " + error.message
+          );
+        }
+      }
+
+      // 예시 메시지 전송
+      function sendExample(message) {
+        console.log("🔍 sendExample 호출됨:", message);
+        console.log("🔗 연결 상태:", isConnected);
+        console.log("🌐 소켓 상태:", socket ? socket.readyState : "소켓 없음");
+
+        if (!isConnected) {
+          console.log("❌ 연결되지 않음 - 예시 메시지 전송 불가");
+          addMessage(
+            "system",
+            "❌ 서버에 연결되지 않았습니다. 연결을 확인해주세요."
+          );
+          return;
+        }
+
+        if (!socket || socket.readyState !== WebSocket.OPEN) {
+          console.log("❌ 소켓이 열려있지 않음 - 예시 메시지 전송 불가");
+          addMessage(
+            "system",
+            "❌ WebSocket 연결이 끊어졌습니다. 재연결을 시도해주세요."
+          );
+          return;
+        }
+
+        console.log("✅ 예시 메시지 전송 시작");
+        addMessage("user", message);
+
+        try {
+          const messageData = {
+            type: "user_message",
+            message: message,
+          };
+          console.log("📤 전송할 예시 데이터:", messageData);
+
+          socket.send(JSON.stringify(messageData));
+          console.log("✅ 예시 메시지 전송 완료");
+        } catch (error) {
+          console.error("❌ 예시 메시지 전송 오류:", error);
+          addMessage(
+            "system",
+            "❌ 예시 메시지 전송 중 오류가 발생했습니다: " + error.message
+          );
+        }
+      }
+
+      // 메시지 추가
+      function addMessage(type, content, info = "") {
+        const messagesContainer = document.getElementById("messages");
+        const messageDiv = document.createElement("div");
+        messageDiv.className = `message ${type}`;
+
+        const contentDiv = document.createElement("div");
+        contentDiv.className = "message-content";
+        contentDiv.textContent = content;
+
+        if (info) {
+          const infoDiv = document.createElement("div");
+          infoDiv.style.fontSize = "11px";
+          infoDiv.style.opacity = "0.7";
+          infoDiv.style.marginTop = "5px";
+          infoDiv.textContent = info;
+          contentDiv.appendChild(infoDiv);
+        }
+
+        messageDiv.appendChild(contentDiv);
+        messagesContainer.appendChild(messageDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      }
+
+      // 봇 메시지 시작
+      function startBotMessage(initialText = "") {
+        const messagesContainer = document.getElementById("messages");
+
+        const messageDiv = document.createElement("div");
+        messageDiv.className = "message bot";
+
+        const contentDiv = document.createElement("div");
+        contentDiv.className = "message-content";
+        contentDiv.textContent = initialText;
+
+        messageDiv.appendChild(contentDiv);
+        messagesContainer.appendChild(messageDiv);
+
+        currentBotMessageDiv = contentDiv;
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      }
+
+      // 봇 메시지 업데이트
+      function updateBotMessage(delta) {
+        if (!currentBotMessageDiv) {
+          startBotMessage();
+        }
+
+        currentBotMessageDiv.textContent += delta;
+        document.getElementById("messages").scrollTop =
+          document.getElementById("messages").scrollHeight;
+      }
+
+      // 봇 메시지 완료
+      function finalizeBotMessage(finalText) {
+        if (currentBotMessageDiv && finalText) {
+          currentBotMessageDiv.textContent = finalText;
+        }
+        currentBotMessageDiv = null;
+      }
+
+      // 음성 모드 토글
+      function toggleVoiceMode() {
+        voiceMode = !voiceMode;
+        const btn = document.getElementById("voiceModeBtn");
+        const controls = document.getElementById("voiceControls");
+
+        if (voiceMode) {
+          btn.textContent = "음성 모드 ON";
+          btn.classList.add("active");
+          controls.style.display = "flex";
+          initAudioContext();
+        } else {
+          btn.textContent = "음성 모드 OFF";
+          btn.classList.remove("active");
+          controls.style.display = "none";
+          if (isRecording) {
+            stopRecording();
+          }
+        }
+      }
+
+      // 오디오 컨텍스트 초기화
+      function initAudioContext() {
+        if (!audioContext) {
+          audioContext = new (window.AudioContext ||
+            window.webkitAudioContext)();
+        }
+      }
+
+      // 녹음 토글
+      function toggleRecording() {
+        if (isRecording) {
+          stopRecording();
+        } else {
+          startRecording();
+        }
+      }
+
+      // 녹음 시작
+      async function startRecording() {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+          });
+          mediaRecorder = new MediaRecorder(stream);
+          audioChunks = [];
+
+          mediaRecorder.ondataavailable = (event) => {
+            audioChunks.push(event.data);
+          };
+
+          mediaRecorder.onstop = () => {
+            const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+            sendAudioToServer(audioBlob);
+          };
+
+          mediaRecorder.start();
+          isRecording = true;
+
+          const btn = document.getElementById("recordBtn");
+          btn.textContent = "🛑 녹음 중지";
+          btn.classList.add("recording");
+
+          document.getElementById("recordingStatus").textContent =
+            "🎤 녹음 중... 말씀을 마치시면 중지 버튼을 눌러주세요.";
+        } catch (error) {
+          console.error("녹음 시작 오류:", error);
+          addMessage("system", "❌ 마이크 접근 권한이 필요합니다.");
+        }
+      }
+
+      // 녹음 중지
+      function stopRecording() {
+        if (mediaRecorder) {
+          mediaRecorder.stop();
+          mediaRecorder.stream.getTracks().forEach((track) => track.stop());
+        }
+
+        isRecording = false;
+
+        const btn = document.getElementById("recordBtn");
+        btn.textContent = "🎤 녹음 시작";
+        btn.classList.remove("recording");
+
+        document.getElementById("recordingStatus").textContent =
+          "음성 처리 중...";
+      }
+
+      // 서버로 오디오 전송 (실제 구현)
+      async function sendAudioToServer(audioBlob) {
+        if (!isConnected || !socket || socket.readyState !== WebSocket.OPEN) {
+          addMessage("system", "❌ 서버에 연결되지 않았습니다.");
+          document.getElementById("recordingStatus").textContent =
+            "음성 모드 활성화됨";
+          return;
+        }
+
+        try {
+          console.log("🎤 오디오 데이터 처리 시작:", audioBlob.size, "bytes");
+          addMessage("system", "🔄 음성을 서버로 전송하고 있습니다...");
+
+          // AudioBuffer로 변환
+          const arrayBuffer = await audioBlob.arrayBuffer();
+          const audioContext = new (window.AudioContext ||
+            window.webkitAudioContext)();
+          const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+          // PCM16 형식으로 변환
+          const pcm16Data = convertToPCM16(audioBuffer);
+
+          // Base64로 인코딩
+          const base64Audio = arrayBufferToBase64(pcm16Data);
+
+          // WebSocket으로 전송
+          socket.send(
+            JSON.stringify({
+              type: "audio_data",
+              audio: base64Audio,
+            })
+          );
+
+          // 오디오 전송 완료 신호
+          socket.send(
+            JSON.stringify({
+              type: "audio_commit",
+            })
+          );
+
+          console.log("📡 오디오 전송 완료:", base64Audio.length, "characters");
+
+          document.getElementById("recordingStatus").textContent =
+            "🔄 음성 응답을 기다리고 있습니다...";
+        } catch (error) {
+          console.error("❌ 오디오 전송 오류:", error);
+          addMessage(
+            "system",
+            "❌ 음성 처리 중 오류가 발생했습니다: " + error.message
+          );
+          document.getElementById("recordingStatus").textContent =
+            "음성 모드 활성화됨";
+        }
+      }
+
+      // AudioBuffer를 PCM16으로 변환
+      function convertToPCM16(audioBuffer) {
+        const length = audioBuffer.length;
+        const pcm16 = new Int16Array(length);
+        const channelData = audioBuffer.getChannelData(0); // 첫 번째 채널 사용
+
+        for (let i = 0; i < length; i++) {
+          // Float32를 Int16으로 변환 (-1.0 ~ 1.0 → -32768 ~ 32767)
+          const sample = Math.max(-1, Math.min(1, channelData[i]));
+          pcm16[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+        }
+
+        return pcm16.buffer;
+      }
+
+      // ArrayBuffer를 Base64로 변환
+      function arrayBufferToBase64(buffer) {
+        const bytes = new Uint8Array(buffer);
+        let binary = "";
+        for (let i = 0; i < bytes.byteLength; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        return window.btoa(binary);
+      }
+
+      // 오디오 재생 (실제 구현)
+      let audioQueue = [];
+      let isPlayingAudio = false;
+      let currentAudioContext = null;
+
+      function playAudioDelta(audioData) {
+        console.log("🔊 오디오 재생:", audioData.length, "characters");
+
+        try {
+          // Base64 디코딩
+          const binaryString = window.atob(audioData);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+
+          // PCM16 데이터를 AudioBuffer로 변환
+          const pcm16Data = new Int16Array(bytes.buffer);
+
+          // 오디오 큐에 추가
+          audioQueue.push(pcm16Data);
+
+          // 재생 중이 아니면 재생 시작
+          if (!isPlayingAudio) {
+            playNextAudio();
+          }
+        } catch (error) {
+          console.error("❌ 오디오 재생 오류:", error);
+        }
+      }
+
+      async function playNextAudio() {
+        if (audioQueue.length === 0) {
+          isPlayingAudio = false;
+          return;
+        }
+
+        isPlayingAudio = true;
+
+        try {
+          if (!currentAudioContext) {
+            currentAudioContext = new (window.AudioContext ||
+              window.webkitAudioContext)();
+          }
+
+          const pcm16Data = audioQueue.shift();
+
+          // PCM16를 Float32로 변환
+          const floatData = new Float32Array(pcm16Data.length);
+          for (let i = 0; i < pcm16Data.length; i++) {
+            floatData[i] = pcm16Data[i] / 32768.0;
+          }
+
+          // AudioBuffer 생성 (샘플링 레이트 24000Hz, 모노)
+          const audioBuffer = currentAudioContext.createBuffer(
+            1,
+            floatData.length,
+            24000
+          );
+          audioBuffer.getChannelData(0).set(floatData);
+
+          // AudioSource 생성 및 재생
+          const source = currentAudioContext.createBufferSource();
+          source.buffer = audioBuffer;
+          source.connect(currentAudioContext.destination);
+
+          source.onended = () => {
+            // 다음 오디오 재생
+            setTimeout(() => playNextAudio(), 10);
+          };
+
+          source.start();
+        } catch (error) {
+          console.error("❌ 오디오 재생 처리 오류:", error);
+          isPlayingAudio = false;
+        }
+      }
+
+      // 연결 테스트
+      function testConnection() {
+        if (isConnected && socket && socket.readyState === WebSocket.OPEN) {
+          addMessage(
+            "system",
+            `✅ 연결 상태 양호! WebSocket이 안정적으로 작동 중입니다.
+📊 상태: ${connectionStable ? "안정" : "불안정"}
+🔄 재연결 시도: ${reconnectAttempts}/${maxReconnectAttempts}
+🔗 WebSocket 상태: ${socket.readyState === WebSocket.OPEN ? "OPEN" : "CLOSED"}`
+          );
+        } else if (socket && socket.readyState === WebSocket.CONNECTING) {
+          addMessage("system", "🔄 연결 시도 중입니다. 잠시만 기다려주세요...");
+        } else {
+          addMessage(
+            "system",
+            `❌ 연결되지 않음. 다음을 확인해주세요:
+1. npm run dev 명령으로 chatbot.js가 실행 중인지
+2. 포트 3000이 사용 가능한지
+3. 방화벽 설정이 올바른지
+🔄 재연결 시도: ${reconnectAttempts}/${maxReconnectAttempts}`
+          );
+
+          // 수동 재연결 시도
+          if (reconnectAttempts < maxReconnectAttempts) {
+            addMessage("system", "🔄 수동 재연결을 시도합니다...");
+            setTimeout(() => connectWebSocket(), 1000);
+          }
+        }
+      }
+
+      // 대화 초기화
+      function clearChat() {
+        const messages = document.getElementById("messages");
+        const systemElements = messages.querySelectorAll(
+          ".welcome-section, .features, .connection-info, .quick-examples, .controls, .voice-controls"
+        );
+        messages.innerHTML = "";
+
+        // 시스템 요소들 다시 추가
+        systemElements.forEach((el) => messages.appendChild(el));
+
+        addMessage(
+          "bot",
+          "대화가 초기화되었습니다. 새로운 대화를 시작해보세요! 🔄",
+          "AI 어시스턴트"
+        );
+      }
+
+      // 연결 초기화 (완전 재시작)
+      function resetConnection() {
+        console.log("연결 완전 초기화 시작...");
+
+        // 모든 타이머 정리
+        if (reconnectTimer) {
+          clearTimeout(reconnectTimer);
+          reconnectTimer = null;
+        }
+
+        // 소켓 정리
+        if (socket) {
+          socket.onopen = null;
+          socket.onmessage = null;
+          socket.onclose = null;
+          socket.onerror = null;
+          if (
+            socket.readyState === WebSocket.OPEN ||
+            socket.readyState === WebSocket.CONNECTING
+          ) {
+            socket.close(1000, "Manual reset");
+          }
+          socket = null;
+        }
+
+        // 상태 초기화
+        isConnected = false;
+        connectionStable = false;
+        reconnectAttempts = 0;
+
+        updateStatus("disconnected", "🔄 초기화 중...");
+        updateConnectionInfo("연결을 완전히 초기화하고 새로 연결합니다...");
+
+        // 1초 후 새로 연결
+        setTimeout(() => {
+          connectWebSocket();
+        }, 1000);
+      }
+
+      // 음성 변경
+      document
+        .getElementById("voiceSelect")
+        .addEventListener("change", function () {
+          if (isConnected) {
+            socket.send(
+              JSON.stringify({
+                type: "voice_change",
+                voice: this.value,
+              })
+            );
+            addMessage("system", `음성이 ${this.value}로 변경되었습니다.`);
+          }
+        });
+
+      // 입력창 자동 크기 조절
+      document
+        .getElementById("messageInput")
+        .addEventListener("input", function () {
+          this.style.height = "auto";
+          this.style.height = Math.min(this.scrollHeight, 120) + "px";
+        });
+
+      // 엔터키로 전송
+      document
+        .getElementById("messageInput")
+        .addEventListener("keypress", function (e) {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+          }
+        });
+
+      // 페이지 로드 시 연결 (한 번만)
+      window.addEventListener("load", function () {
+        console.log("페이지 로드 완료 - 초기 연결 시작");
+        // 초기 상태 설정
+        reconnectAttempts = 0;
+        connectionStable = false;
+
+        // 초기 연결 시도
+        setTimeout(() => {
+          connectWebSocket();
+        }, 500); // 페이지 로드 후 약간 지연
+      });
+
+      // 페이지 언로드 시 정리
+      window.addEventListener("beforeunload", function () {
+        console.log("페이지 언로드 - 연결 정리");
+
+        // 타이머 정리
+        if (reconnectTimer) {
+          clearTimeout(reconnectTimer);
+          reconnectTimer = null;
+        }
+
+        // 소켓 정리
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          socket.close(1000, "Page unload");
+        }
+      });
+    </script>
+  </body>
+</html>

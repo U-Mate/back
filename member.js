@@ -1,5 +1,5 @@
-import db from './db';
-import { randomInt, randomBytes } from 'crypto';
+const { randomInt, randomBytes } = require('crypto');
+const { db } = require('./db.js');
 
 const argon2  = require("@node-rs/argon2");
 const nodemailer = require('nodemailer');
@@ -154,7 +154,7 @@ const checkAuth = async (req, res) => {
     }
 }
 
-export { signUp, phoneNumberDuplicate, emailAuth, checkAuth };
+module.exports = { signUp, phoneNumberDuplicate, emailAuth, checkAuth };
 
 // 정규표현식
 const effectiveness = (email, birthDay, password) => {
