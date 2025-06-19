@@ -316,8 +316,11 @@ const withDrawal = async (req, res) => {
             console.error("비밀번호가 일치하지 않습니다.");
             return res.status(404).json({success : false, message : "일치하지 않습니다."});
         }
-        await db.query('DELETE FROM USER WHERE EMAIL = ?', [email]);
-        await db.query('DELETE FROM TOKEN WHERE EMAIL = ?', [email]);
+        const birthDay = new Date(rows[0].BIRTHDAY.getFullYear(), 0, 1, 0, 0, 0);
+
+        await conn.query('UPDATE USER SET EMAIL = "", PASSWORD = "", NAME = "", GENDER = "", BIRTHDAY = ?, PHONE_NUMBER = 0, PHONE_PLAN = 0, FAIL_CNT = 0 WHERE EMAIL = ?', [birthDay, email]);
+        
+        await conn.query('DELETE FROM TOKEN WHERE EMAIL = ?', [email]);
 
         res.clearCookie('token', {
             httpOnly : true,
@@ -347,7 +350,7 @@ const login = async (req, res) => {
     await conn.beginTransaction();
 
     try {
-        const [rows] = await db.query('SELECT * FROM USER WHERE EMAIL = ? OR PHONE_NUMBER = ?', [id, id]);
+        const [rows] = await conn.query('SELECT * FROM USER WHERE EMAIL = ? OR PHONE_NUMBER = ?', [id, id]);
 
         if(rows.length === 0){
             await conn.rollback();
