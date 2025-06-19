@@ -4,13 +4,13 @@
 
 const db = require("./db");
 
-// 1) 전체 요금제 리스트 조회
+//  1) 전체 요금제 리스트 조회
 
-const 요금제리스트 = async (req, res) => {
+const getPlanList = async (req, res) => {
   const conn = await db.getConnection();
   await conn.beginTransaction();
   try {
-    const [rows] = await conn.query(`
+    const [plans] = await conn.query(`
       SELECT
         p.ID               AS PLAN_ID,
         p.NAME             AS PLAN_NAME,
@@ -31,26 +31,26 @@ const 요금제리스트 = async (req, res) => {
 
     await conn.commit();
     conn.release();
-    return res.json({ success: true, data: rows });
+    return res.json({ success: true, data: plans });
   } catch (err) {
     console.error(err);
     await conn.rollback();
     conn.release();
     return res
       .status(500)
-      .json({ success: false, error: "요금제 리스트 조회에 실패했습니다." });
+      .json({ success: false, error: "Failed to fetch plan list." });
   }
 };
 
 //  2) 요금제 상세 정보 조회
 
-const 요금제상세조회 = async (req, res) => {
+const getPlanDetail = async (req, res) => {
   const { planId } = req.params;
   const conn = await db.getConnection();
   await conn.beginTransaction();
   try {
     // 기본 정보 조회
-    const [[plan]] = await conn.query(
+    const [plans] = await conn.query(
       `SELECT
          p.ID               AS PLAN_ID,
          p.NAME             AS PLAN_NAME,
@@ -69,42 +69,38 @@ const 요금제상세조회 = async (req, res) => {
        WHERE p.ID = ?`,
       [planId]
     );
+    const plan = plans[0];
     if (!plan) {
       conn.release();
-      return res
-        .status(404)
-        .json({ success: false, error: "존재하지 않는 요금제입니다." });
+      return res.status(404).json({ success: false, error: "Plan not found." });
     }
 
     // 혜택 목록 조회
     const [benefits] = await conn.query(
-      `
-      SELECT
-        bi.BENEFIT_ID,
-        bi.NAME,
-        bi.TYPE
-      FROM ChatBot.PLAN_BENEFIT pb
-      JOIN ChatBot.BENEFIT_INFO bi
-        ON pb.BENEFIT_ID = bi.BENEFIT_ID
-      WHERE pb.PLAN_ID = ?
-      ORDER BY pb.ID
-    `,
+      `SELECT
+         bi.BENEFIT_ID,
+         bi.NAME,
+         bi.TYPE
+       FROM ChatBot.PLAN_BENEFIT pb
+       JOIN ChatBot.BENEFIT_INFO bi
+         ON pb.BENEFIT_ID = bi.BENEFIT_ID
+       WHERE pb.PLAN_ID = ?
+       ORDER BY pb.ID`,
       [planId]
     );
 
     // 리뷰 목록 조회
     const [reviews] = await conn.query(
-      `
-      SELECT
-        REVIEW_ID,
-        USER_ID,
-        STAR_RATING,
-        REVIEW_CONTENT,
-        CREATED_AT
-      FROM ChatBot.PLAN_REVIEW
-      WHERE PLAN_ID = ?
-      ORDER BY CREATED_AT DESC
-    `,
+      `SELECT
+         REVIEW_ID,
+         USER_ID,
+         STAR_RATING,
+         REVIEW_CONTENT,
+         CREATED_AT,
+         UPDATED_AT
+       FROM ChatBot.PLAN_REVIEW
+       WHERE PLAN_ID = ?
+       ORDER BY CREATED_AT DESC`,
       [planId]
     );
 
@@ -117,14 +113,14 @@ const 요금제상세조회 = async (req, res) => {
     conn.release();
     return res
       .status(500)
-      .json({ success: false, error: "요금제 상세 조회에 실패했습니다." });
+      .json({ success: false, error: "Failed to fetch plan detail." });
   }
 };
 
 //  3) 요금제 필터링 조회
 
-const 요금제필터링 = async (req, res) => {
-  const { ageGroup, minFee, maxFee, dataType, benefitIds } = req.query;
+const filterPlans = async (req, res) => {
+  const { ageGroup, minFee, maxFee, dataType, benefitIds } = req.body;
   const benefitIdArr = benefitIds
     ? benefitIds
         .split(",")
@@ -147,61 +143,61 @@ const 요금제필터링 = async (req, res) => {
       FROM ChatBot.PLAN_INFO p
     `;
     const params = [];
-    const where = [];
+    const whereClauses = [];
 
     // 연령대 필터
     if (ageGroup && ageGroup !== "전체대상" && ageGroup !== "상관없음") {
-      where.push("p.AGE_GROUP = ?");
+      whereClauses.push("p.AGE_GROUP = ?");
       params.push(ageGroup);
     }
     // 요금 범위 필터
-    if (minFee) {
-      where.push("p.MONTHLY_FEE >= ?");
+    if (minFee != null) {
+      whereClauses.push("p.MONTHLY_FEE >= ?");
       params.push(Number(minFee));
     }
-    if (maxFee) {
-      where.push("p.MONTHLY_FEE <= ?");
+    if (maxFee != null) {
+      whereClauses.push("p.MONTHLY_FEE <= ?");
       params.push(Number(maxFee));
     }
     // 데이터 조건 필터
     if (dataType && dataType !== "상관없음") {
-      where.push("p.DATA_INFO = ?");
+      whereClauses.push("p.DATA_INFO = ?");
       params.push(dataType);
     }
     // 혜택 필터
     if (benefitIdArr.length) {
       sql += ` JOIN ChatBot.PLAN_BENEFIT pb ON pb.PLAN_ID = p.ID `;
-      const ph = benefitIdArr.map(() => "?").join(",");
-      where.push(`pb.BENEFIT_ID IN (${ph})`);
+      const placeholders = benefitIdArr.map(() => "?").join(",");
+      whereClauses.push(`pb.BENEFIT_ID IN (${placeholders})`);
       params.push(...benefitIdArr);
     }
 
-    if (where.length) sql += " WHERE " + where.join(" AND ");
+    if (whereClauses.length) {
+      sql += " WHERE " + whereClauses.join(" AND ");
+    }
 
     // 선택된 모든 혜택을 포함할 것
     if (benefitIdArr.length) {
-      sql += ` GROUP BY p.ID HAVING COUNT(DISTINCT pb.BENEFIT_ID) = ? `;
+      sql += " GROUP BY p.ID HAVING COUNT(DISTINCT pb.BENEFIT_ID) = ?";
       params.push(benefitIdArr.length);
     }
 
-    sql += " ORDER BY p.MONTHLY_FEE";
-
-    const [rows] = await conn.query(sql, params);
+    const [plans] = await conn.query(sql, params);
     await conn.commit();
     conn.release();
-    return res.json({ success: true, data: rows });
+    return res.json({ success: true, data: plans });
   } catch (err) {
     console.error(err);
     await conn.rollback();
     conn.release();
     return res
       .status(500)
-      .json({ success: false, error: "요금제 필터링 조회에 실패했습니다." });
+      .json({ success: false, error: "Failed to filter plans." });
   }
 };
 
 module.exports = {
-  요금제리스트,
-  요금제상세조회,
-  요금제필터링,
+  getPlanList,
+  getPlanDetail,
+  filterPlans,
 };
