@@ -56,6 +56,8 @@ const signUp = async (req, res) => {
 
         await conn.query('INSERT INTO USER(NAME, GENDER, BIRTHDAY, PHONE_NUMBER, PHONE_PLAN, EMAIL, PASSWORD) VALUES(?, ?, ?, ?, ?, ?, ?)', [name, gender, birthDay, phoneNumber, phonePlan, email, hashPassword]);
 
+        const [rows] = await conn.query('SELECT * FROM PHONE_PLAN WHERE ID = ?', [phonePlan]);
+        await conn.query('UPDATE USER SET USER_COUNT = ? WHERE ID = ?', [rows[0].USER_COUNT + 1, phonePlan]);
         await conn.commit();
         conn.release();
         console.log(`${email} 회원가입 성공`);
@@ -532,6 +534,32 @@ const authenticateToken = async (req, res, next) => {
         });
         console.error(error);
         return res.status(500).json({error : "토큰 검증 중 오류가 발생했습니다.\n안전을 위해 로그아웃 처리되었습니다."});
+    }
+}
+
+const getUserInfo = async (req, res) => {
+    const { email, password } = req.body;
+
+    try {
+        const [rows] = await db.query('SELECT * FROM USER WHERE EMAIL = ?', [email]);
+
+        if(rows.length === 0){
+            console.error("비정상적인 접근입니다.");
+            return res.status(404).json({success : false, message : "비정상적인 접근입니다."});
+        }
+
+        const valid = await argon2.verify(rows[0].PASSWORD, password);
+
+        if(!valid){
+            console.error("비밀번호가 일치하지 않습니다.");
+            return res.status(404).json({success : false, message : "일치하지 않습니다."});
+        }
+        
+        console.log(`${email} 유저 정보 조회 성공`);
+        return res.status(200).json({success : true, name : rows[0].NAME, gender : rows[0].GENDER, birthDay : rows[0].BIRTHDAY, phoneNumber : rows[0].PHONE_NUMBER, phonePlan : rows[0].PHONE_PLAN, email : rows[0].EMAIL});
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({error : "비밀번호 확인 중 오류가 발생했습니다."});
     }
 }
 
