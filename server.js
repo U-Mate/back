@@ -2,7 +2,6 @@ require('dotenv').config();
 const fs = require("fs");
 const express = require("express");
 const axios = require('axios');
-const jwt = require("jsonwebtoken");
 const cookieParser = require('cookie-parser');
 
 const app = express();

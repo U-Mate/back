@@ -1,10 +1,12 @@
-import db from './db';
-import { randomInt, randomBytes } from 'crypto';
+const db = require('./db');
+const { randomInt, randomBytes } = require('crypto');
 
 const argon2  = require("@node-rs/argon2");
 const nodemailer = require('nodemailer');
 
 const jwtSecret = process.env.JWT_SECRET;
+
+const jwt = require("jsonwebtoken");
 
 const transporter = nodemailer.createTransport({
     host : "smtp.gmail.com",
@@ -39,7 +41,7 @@ const signUp = async (req, res) => {
     await conn.beginTransaction();
 
     try {
-        if(effectiveness(email, birthDay, password)){
+        if(effectiveness(email, phoneNumber, birthDay, password)){
             conn.release();
             console.error("올바르지못한 형식");
             return res.status(404).json({message : "올바르지못한 형식입니다."});
@@ -52,7 +54,7 @@ const signUp = async (req, res) => {
             parallelism : Number(process.env.PARALLELISM)
         });
 
-        await conn.query('INSERT INTO USER(NAME, GENDER, BIRTHDAY, PHONE_NUMBER, PHONE_PLAN, EMAIL, PASSWORD) VALUES(?, ?, ?, ?, ?, ?)', [name, gender, birthDay, phoneNumber, phonePlan, email, hashPassword]);
+        await conn.query('INSERT INTO USER(NAME, GENDER, BIRTHDAY, PHONE_NUMBER, PHONE_PLAN, EMAIL, PASSWORD) VALUES(?, ?, ?, ?, ?, ?, ?)', [name, gender, birthDay, phoneNumber, phonePlan, email, hashPassword]);
 
         await conn.commit();
         conn.release();
@@ -94,15 +96,13 @@ const emailAuth = async (req, res) => {
     await conn.beginTransaction();
 
     try {
-        if(effectiveness(email)){
+        if(effectiveness(email, undefined, undefined, undefined)){
             conn.release();
             console.error("올바르지못한 형식");
             return res.status(404).json({message : "올바르지못한 형식입니다."});
         }
 
         // 보안 강화장치
-        const x = randomInt(0, 10000);
-
         const buf = randomBytes(6); // 48비트 암호학적 난수 생성
         const num = buf.readUIntBE(0, 6) / 2**48;
         const value = Math.floor(num * 10000);
@@ -163,6 +163,11 @@ const passwordChange = async (req, res) => {
     const { email, password, newPassword } = req.body;
 
     try {
+        if(effectiveness(undefined, undefined, undefined, newPassword)){
+            console.error("올바르지못한 형식");
+            return res.status(404).json({message : "올바르지못한 형식입니다."});
+        }
+
         const hashNewPassword = await argon2.hash(newPassword, {
             type : argon2.Algorithm.Argon2id,
             timeCost : Number(process.env.TIME_COST),
@@ -199,6 +204,11 @@ const passwordReset = async (req, res) => {
     const { email, password } = req.body;
 
     try {
+        if(effectiveness(undefined, undefined, undefined, password)){
+            console.error("올바르지못한 형식");
+            return res.status(404).json({message : "올바르지못한 형식입니다."});
+        }
+
         const [rows] = await db.query('SELECT * FROM USER WHERE EMAIL = ?', [email]);
 
         if(rows.length === 0){
@@ -329,24 +339,25 @@ const withDrawal = async (req, res) => {
 
 // 로그인
 const login = async (req, res) => {
-    const { email, password } = req.body;
+    const { id, password } = req.body;
 
     const conn = await db.getConnection();
     await conn.beginTransaction();
 
     try {
-        const [rows] = await db.query('SELECT * FROM USER WHERE EMAIL = ?', [email]);
+        const [rows] = await db.query('SELECT * FROM USER WHERE EMAIL = ? OR PHONE_NUMBER = ?', [id, id]);
 
         if(rows.length === 0){
             await conn.rollback();
             conn.release();
-            console.error(`${email} 아이디가 일치하지않습니다.`);
+            console.error(`${id} 아이디가 일치하지않습니다.`);
             return res.status(404).json({success : false, message : "로그인에 실패했습니다."});
         }else{
+            const email = rows[0].EMAIL;
             if(rows[0].FAIL_CNT >= 5){
                 await conn.rollback();
                 conn.release();
-                console.error(`${email} 비밀번호 5회 실패로 인해 로그인에 실패했습니다.`);
+                console.error(`${id} 비밀번호 5회 실패로 인해 로그인에 실패했습니다.`);
                 return res.status(404).json({success : false, message : "비밀번호 5회 이상 실패했습니다.\n비밀번호 재설정 후 다시 시도해주세요."});
             }
 
@@ -356,7 +367,7 @@ const login = async (req, res) => {
                 await db.query('UPDATE USER SET FAIL_CNT = ? WHERE EMAIL = ?', [rows[0].FAIL_CNT + 1, email]);
                 await conn.commit();
                 conn.release();
-                console.error(`${email} 패스워드가 일치하지않습니다.`);
+                console.error(`${id} 패스워드가 일치하지않습니다.`);
                 return res.status(404).json({success : false, message : "로그인에 실패했습니다."});
             }
 
@@ -435,7 +446,7 @@ const tokenCheck = async (req, res) => {
     await conn.beginTransaction();
 
     try {
-        const [rows] = await db.query('SELECT * FROM TOKEN WHERE EMAIL = ?', [email]);
+        const [rows] = await db.query('SELECT * FROM TOKEN WHERE EMAIL = ?', [email.email]);
 
         if(rows.length === 0){
             await conn.rollback();
@@ -524,26 +535,63 @@ const authenticateToken = async (req, res, next) => {
     }
 }
 
-export { signUp, phoneNumberDuplicate, emailAuth, checkAuth };
+module.exports = { signUp, phoneNumberDuplicate, emailAuth, checkAuth, passwordChange, passwordReset, passwordCheck, phoneNumberCheck, withDrawal, login, logout, tokenCheck, authenticateToken };
 
 // 정규표현식
-const effectiveness = (email, birthDay, password) => {
+const effectiveness = (email, phoneNumber, birthDay, password) => {
     // 1. 아이디: 영문 소문자 + 숫자 조합, 5~20자, 특수문자 제외
-    const idRegex = /^(?=.*[a-z])(?=.*\d)[a-z\d]{5,20}$/;
+    const idRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
-    // 3. 비밀번호: 영문 대/소문자 + 숫자 + 특수문자 포함, 8~20자
-    const passwordRegex = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,20}$/;
+    // 2. 휴대폰 번호: 10~11자리 숫자, 특수문자 제외
+    const phoneNumberRegex = /^\d{10,11}$/;
 
-    if(email){
-        if(!idRegex.test(email)){
+    // 3. 생년월일: 8자리 숫자, yyyymmdd 형식, 유효한 날짜 검증
+    const birthDayRegex = /^\d{8}$/;
+
+    // 4. 비밀번호: 영문 대문자 + 소문자 + 숫자 + 특수문자 각각 1개 이상 포함, 12~20자
+    const passwordRegex = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{12,20}$/;
+
+    if(!email && !phoneNumber && !birthDay && !password){
+        return true;
+    }
+
+    if(email && !idRegex.test(email)){
+        return true;
+    }
+
+    if(phoneNumber && !phoneNumberRegex.test(phoneNumber)){
+        return true;
+    }
+
+    if(birthDay && !birthDayRegex.test(birthDay)){
+        return true;
+    }
+
+    if(birthDay && birthDayRegex.test(birthDay)) {
+        const year = parseInt(birthDay.substring(0, 4));
+        const month = parseInt(birthDay.substring(4, 6));
+        const day = parseInt(birthDay.substring(6, 8));
+        
+        // 년도 검증 (1900년 ~ 현재년도)
+        const currentYear = new Date().getFullYear();
+        if(year < 1900 || year > currentYear) {
+            return true;
+        }
+        
+        // 월 검증 (1~12)
+        if(month < 1 || month > 12) {
+            return true;
+        }
+        
+        // 일 검증 (각 월의 유효한 일수)
+        const daysInMonth = new Date(year, month, 0).getDate();
+        if(day < 1 || day > daysInMonth) {
             return true;
         }
     }
 
-    if(password){
-        if(!passwordRegex.test(password)){
-            return true;
-        }
+    if(password && !passwordRegex.test(password)){
+        return true;
     }
     return false;
 }
