@@ -8,4 +8,4 @@ const db = mariaDB.createPool({
     database : process.env.DB_SCHEMA
 });
 
-export default db;
+module.exports = db;
