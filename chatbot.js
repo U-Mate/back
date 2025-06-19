@@ -2,6 +2,7 @@ require('dotenv').config();
 const WebSocket = require('ws');
 const axios = require('axios');
 const { loadPreviousChatToOpenAI, loadChatHistory, saveChatHistory, setUpContext } = require('./chatbot-history');
+const { filterMessage } = require('./chatbot-filter');
 
 // 사용자별 연결 저장
 const userConnections = new Map();
@@ -50,7 +51,38 @@ const realtime = (clientWs, req) => {
       
       switch (data.type) {
         case 'user_message':
-          // 💾 사용자 메시지 히스토리 저장
+          // 🔥 메시지 필터링 적용
+          const filterResult = filterMessage(data.message);
+          
+          if (!filterResult.allowed) {
+            console.log(`🚫 메시지 차단됨: ${filterResult.reason} - "${data.message}"`);
+            
+            // 필터링된 메시지에 대한 응답을 클라이언트에 전송
+            clientWs.send(JSON.stringify({
+              type: 'filtered_message',
+              reason: filterResult.reason,
+              messageType: filterResult.type,
+              response: filterResult.response
+            }));
+            
+            // 사용자에게 대체 응답 전송 (마치 AI가 답변한 것처럼)
+            clientWs.send(JSON.stringify({
+              type: 'text_done',
+              text: filterResult.response,
+              response_id: 'filter_response',
+              item_id: 'filter_item',
+              filtered: true
+            }));
+            
+            // 🚫 필터링된 메시지는 DB에 저장하지 않음
+            console.log(`🗑️ 필터링된 메시지 DB 저장 건너뜀: "${data.message}"`);
+            
+            return; // 더 이상 처리하지 않고 종료
+          }
+          
+          console.log(`✅ 메시지 필터링 통과: 관련성 점수 ${filterResult.relevanceScore}`);
+          
+          // 💾 사용자 메시지 히스토리 저장 (필터링 통과한 경우에만)
           if (userEmail) {
             await saveChatHistory(userEmail, 'user', data.message);
           }
@@ -253,7 +285,50 @@ const realtime = (clientWs, req) => {
           // 음성 인식 완료
           const userTranscript = event.transcript;
           
-          // �� 사용자 음성 메시지 히스토리 저장
+          // 🔥 음성 메시지도 필터링 적용
+          if (userTranscript) {
+            const audioFilterResult = filterMessage(userTranscript);
+            
+            if (!audioFilterResult.allowed) {
+              console.log(`🚫 음성 메시지 차단됨: ${audioFilterResult.reason} - "${userTranscript}"`);
+              
+              // 필터링된 음성 메시지 응답 전송
+              clientWs.send(JSON.stringify({
+                type: 'filtered_message',
+                reason: audioFilterResult.reason,
+                messageType: audioFilterResult.type,
+                response: audioFilterResult.response,
+                isAudio: true
+              }));
+              
+              // 텍스트로 필터 응답 전송
+              clientWs.send(JSON.stringify({
+                type: 'text_done',
+                text: audioFilterResult.response,
+                response_id: 'audio_filter_response',
+                item_id: 'audio_filter_item',
+                filtered: true,
+                isAudio: true
+              }));
+              
+              // 🚫 필터링된 음성 메시지는 DB에 저장하지 않음
+              console.log(`🗑️ 필터링된 음성 메시지 DB 저장 건너뜀: "${userTranscript}"`);
+              
+              // 음성 인식은 완료되었다고 클라이언트에 알림 (필터링 되었지만)
+              clientWs.send(JSON.stringify({
+                type: 'transcription_complete',
+                transcription: `[필터링됨] ${userTranscript}`,
+                item_id: event.item_id,
+                filtered: true
+              }));
+              
+              return; // 더 이상 처리하지 않고 종료
+            }
+            
+            console.log(`✅ 음성 메시지 필터링 통과: 관련성 점수 ${audioFilterResult.relevanceScore}`);
+          }
+          
+          // 💾 사용자 음성 메시지 히스토리 저장
           if (userEmail && userTranscript) {
             await saveChatHistory(userEmail, 'user', userTranscript);
           }

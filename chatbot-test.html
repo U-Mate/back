@@ -539,6 +539,12 @@
             showMessageOptimization();
             break;
 
+          case "filtered_message":
+            // 🚫 필터링된 메시지에 대한 응답 표시
+            console.log("🚫 필터링된 메시지:", data);
+            addMessage("bot", data.response, "필터링됨");
+            break;
+
           case "transcription_complete":
             addMessage("user", `🎤 "${data.transcription}"`);
             break;

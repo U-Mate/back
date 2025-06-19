@@ -33,6 +33,76 @@ const loadChatHistory = async (email) => {
     }
 }
 
+const loadServiceInfo = async () => {
+    try {
+        // 모든 서비스 정보 로드
+        const [plans] = await db.query("SELECT * FROM PLAN_INFO");
+
+        // ✅ Promise.all()을 사용하여 모든 비동기 작업을 기다림
+        const services = await Promise.all(
+            plans.map(async (plan) => {
+                const [benefits] = await db.query(`
+                    SELECT c.*
+                    from PLAN_INFO a
+                    join PLAN_BENEFIT b on a.ID=b.PLAN_ID
+                    join BENEFIT_INFO c on b.BENEFIT_ID=c.BENEFIT_ID
+                    where a.ID=?
+                `, [plan.ID]);
+
+                return { ...plan, benefits };
+            })
+        );
+
+        console.log(`✅ 모든 서비스 정보 로드 완료: ${services.length}개 요금제`);
+
+        // 서비스 정보 텍스트 생성
+        let serviceInfo = "\n\n=== UMate 서비스 정보 ===\n\n";
+        
+        // 서비스 정보
+        serviceInfo += "📋 제공 서비스 목록:\n";
+        
+        services.forEach(service => {
+            serviceInfo += `• 요금제 정보: ${service.NAME}\n`;
+            serviceInfo += `  - 가격: ${service.MONTHLY_FEE}원\n`;
+            serviceInfo += `  - 음성통화: ${service.CALL_INFO} ${service.CALL_INFO_DETAIL || ''}\n`;
+            serviceInfo += `  - 문자메시지: ${service.SMS_INFO}\n`;
+            serviceInfo += `  - 데이터: ${service.DATA_INFO} ${service.DATA_INFO_DETAIL || ''}\n`;
+            if(service.SHARE_DATA){
+                serviceInfo += `  - 공유 데이터: ${service.SHARE_DATA}\n`;
+            }
+            serviceInfo += `  - 이용 가능 연령: ${service.AGE_GROUP}\n`;
+            serviceInfo += `  - 사용자 수: ${service.USER_COUNT}명\n`;
+            
+            // 평점 계산 (0으로 나누기 방지)
+            const avgRating = service.REVIEW_USER_COUNT > 0 
+                ? (service.RECEIVED_STAR_COUNT / service.REVIEW_USER_COUNT).toFixed(1)
+                : '평점 없음';
+            serviceInfo += `  - 리뷰 평점: ${avgRating}\n`;
+            
+            serviceInfo += `  - 혜택: \n`;
+            let benefitInfo = "";
+            for(const benefit of service.benefits){
+                if(benefit.TYPE !== benefitInfo){
+                    benefitInfo = benefit.TYPE;
+                    serviceInfo += `    • ${benefitInfo}\n`;
+                }
+                serviceInfo += `      - ${benefit.NAME}\n`;
+            }
+            serviceInfo += `\n`; // 요금제 간 구분을 위한 줄바꿈
+        });
+
+        serviceInfo += "=== 서비스 정보 끝 ===\n\n";
+        
+        console.log(`📝 서비스 정보 텍스트 생성 완료: ${serviceInfo.length}자`);
+        
+        return serviceInfo;
+        
+    } catch (error) {
+        console.error('❌ 서비스 정보 로드 오류:', error);
+        return "\n\n※ 현재 서비스 정보를 불러올 수 없습니다.\n\n";
+    }
+}
+
 const loadPreviousChatToOpenAI = async (openaiWs, email, history = null) => {
     try {
         console.log(`유저 정보 수집 시작 : ${email}`);
@@ -45,6 +115,12 @@ const loadPreviousChatToOpenAI = async (openaiWs, email, history = null) => {
             
             if (userRows.length > 0) {
                 const user = userRows[0];
+                
+                // 🔥 서비스 정보도 함께 로드
+                const serviceInfo = await loadServiceInfo();
+                console.log(serviceInfo);
+                
+                // 유저 정보 + 서비스 정보를 함께 전송
                 openaiWs.send(JSON.stringify({
                     type: 'conversation.item.create',
                     item: {
@@ -53,18 +129,70 @@ const loadPreviousChatToOpenAI = async (openaiWs, email, history = null) => {
                         content: [
                             {
                                 type: 'input_text',
-                                text: `사용자 정보: 이름 - ${user.NAME}, 이메일 - ${user.EMAIL}, 성별 - ${user.GENDER}, 생년월일 - ${user.BIRTHDAY}, 지금 사용 중인 요금제 - ${user.PHONE_PLAN}`
+                                text: `사용자 정보: 이름 - ${user.NAME}, 이메일 - ${user.EMAIL}, 성별 - ${user.GENDER}, 생년월일 - ${user.BIRTHDAY}, 지금 사용 중인 요금제 - ${user.PHONE_PLAN}
+
+${serviceInfo}
+
+위 사용자 정보와 서비스 정보를 참고하여 사용자에게 맞춤형 답변을 제공해주세요.`
                             }
                         ]
                     },
                 }));
         
-                console.log(`유저 정보 수집 완료 : ${user.NAME} (${user.EMAIL})`);
+                console.log(`✅ 유저 정보 + 서비스 정보 수집 완료 : ${user.NAME} (${user.EMAIL})`);
             } else {
                 console.log(`유저 정보 없음: ${email}`);
+                
+                // 유저 정보가 없어도 서비스 정보는 제공
+                const serviceInfo = await loadServiceInfo();
+                console.log(serviceInfo);
+
+                openaiWs.send(JSON.stringify({
+                    type: 'conversation.item.create',
+                    item: {
+                        type: 'message',
+                        role: 'user',
+                        content: [
+                            {
+                                type: 'input_text',
+                                text: `게스트 사용자입니다.
+
+${serviceInfo}
+
+위 서비스 정보를 참고하여 답변을 제공해주세요.`
+                            }
+                        ]
+                    },
+                }));
+                
+                console.log(`✅ 게스트 사용자용 서비스 정보 제공 완료`);
             }
         }else{
             console.log(`유저 정보 수집 완료 : 게스트`);
+            
+            // 게스트 사용자에게도 서비스 정보 제공
+            const serviceInfo = await loadServiceInfo();
+            console.log(serviceInfo);
+
+            openaiWs.send(JSON.stringify({
+                type: 'conversation.item.create',
+                item: {
+                    type: 'message',
+                    role: 'user',
+                    content: [
+                        {
+                            type: 'input_text',
+                            text: `게스트 사용자입니다.
+
+${serviceInfo}
+
+위 서비스 정보를 참고하여 답변을 제공해주세요.`
+                        }
+                    ]
+                },
+            }));
+            
+            console.log(`✅ 게스트 사용자용 서비스 정보 제공 완료`);
         }
     } catch (error) {
         console.error('❌ 유저 정보 수집 오류:', error);
