@@ -5,6 +5,8 @@
 // 5)연령대별 맞춤 요금제 조회
 
 const db = require("./db");
+const logger = require("./log");
+const { effectiveness } = require("./verification");
 
 //  1) 전체 요금제 리스트 조회
 const getPlanList = async (req, res) => {
@@ -32,11 +34,14 @@ const getPlanList = async (req, res) => {
 
     await conn.commit();
     conn.release();
+    logger.info(`전체 요금제 리스트 조회 성공`);
     return res.json({ success: true, data: plans });
   } catch (err) {
-    console.error(err);
     await conn.rollback();
     conn.release();
+
+    logger.error(err);
+
     return res.status(500).json({
       success: false,
       error: "요금제 리스트를 가져오는데 실패했습니다.",
@@ -47,6 +52,7 @@ const getPlanList = async (req, res) => {
 //  2) 요금제 상세 정보 조회
 const getPlanDetail = async (req, res) => {
   const { planId } = req.params;
+
   const conn = await db.getConnection();
   await conn.beginTransaction();
   try {
@@ -73,6 +79,8 @@ const getPlanDetail = async (req, res) => {
     const plan = plans[0];
     if (!plan) {
       conn.release();
+
+      logger.error(`${planId} 요금제를 찾지 못 했습니다.`);
       return res
         .status(404)
         .json({ success: false, error: "해당 요금제를 찾지 못 했습니다." });
@@ -109,14 +117,21 @@ const getPlanDetail = async (req, res) => {
 
     await conn.commit();
     conn.release();
-    return res.json({ success: true, data: { plan, benefits, reviews } });
+
+    logger.info(`${planId} 요금제 상세 정보 조회 성공`);
+    return res.json({ success: true, data: { plan, benefits, reviews }, message : "요금제 상세 정보 조회 성공" });
+
   } catch (err) {
-    console.error(err);
+    logger.error(err);
+
     await conn.rollback();
     conn.release();
+
+    logger.error("요금제 상세 정보 조회 중 오류가 발생했습니다.");
+
     return res.status(500).json({
       success: false,
-      error: "요금제 상세 정보를 가져오지 못 했습니다.",
+      error: "요금제 상세 정보 조회 중 오류가 발생했습니다.",
     });
   }
 };
@@ -188,11 +203,14 @@ const filterPlans = async (req, res) => {
     const [plans] = await conn.query(sql, params);
     await conn.commit();
     conn.release();
-    return res.json({ success: true, data: plans });
+
+    logger.info(`${plans.length}개의 요금제 필터링 조회 성공`);
+    return res.json({ success: true, data: plans, message : `${plans.length}개의 요금제 필터링 조회 성공` });
   } catch (err) {
-    console.error(err);
     await conn.rollback();
     conn.release();
+
+    logger.error(err);
     return res
       .status(500)
       .json({ success: false, error: "요금제 필터링에 실패했습니다." });
@@ -213,6 +231,7 @@ const changeUserPlan = async (req, res) => {
     );
     if (!userRows.length) {
       conn.release();
+      logger.error(`${userId} 유저를 찾을 수 없습니다.`);
       return res
         .status(404)
         .json({ success: false, error: "유저를 찾을 수 없습니다." });
@@ -241,11 +260,13 @@ const changeUserPlan = async (req, res) => {
 
     await conn.commit();
     conn.release();
+
+    logger.info(`${userId} 요금제 변경 성공`);
     return res.json({ success: true, message: "요금제 변경에 성공했습니다." });
   } catch (err) {
-    console.error(err);
     await conn.rollback();
     conn.release();
+    logger.error(err);
     return res
       .status(500)
       .json({ success: false, error: "요금제 변경이 실패했습니다." });
@@ -254,12 +275,21 @@ const changeUserPlan = async (req, res) => {
 
 // 5) 연령대별 맞춤 요금제 조회
 const recommendPlansByAge = async (req, res) => {
-  const { userId, birthday } = req.body;
+  const { birthday } = req.body;
 
-  if (!userId || !birthday) {
+  if (!birthday) {
+    logger.error("맞춤 요금제에 대한 비정상적인 접근입니다.");
     return res.status(400).json({
       success: false,
-      error: "userId와 birthday를 모두 보내주세요.",
+      error: "비정상적인 접근입니다.",
+    });
+  }
+
+  if(effectiveness(undefined, undefined, birthday, undefined)){
+    logger.error("생년월일 형식이 올바르지 않습니다.");
+    return res.status(400).json({
+      success: false,
+      error: "생년월일 형식이 올바르지 않습니다.",
     });
   }
 
@@ -315,11 +345,12 @@ const recommendPlansByAge = async (req, res) => {
 
     await conn.commit();
     conn.release();
+    logger.info(`${ageGroup} 연령대별 맞춤 요금제 조회 성공`);
     return res.json({ success: true, data: rows });
   } catch (err) {
-    console.error(err);
     await conn.rollback();
     conn.release();
+    logger.error(err);
     return res.status(500).json({
       success: false,
       error: "맞춤 요금제 찾기에 실패했습니다.",

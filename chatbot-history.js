@@ -1,4 +1,5 @@
 const { db } = require("./db");
+const logger = require("./log");
 
 const saveChatHistory = async (email, messageType, message, audioData = null, contextInfo = null) => {
     const conn = await db.getConnection();
@@ -12,12 +13,12 @@ const saveChatHistory = async (email, messageType, message, audioData = null, co
 
         await conn.commit();
         conn.release();
-        console.log("💾 채팅 히스토리 저장 완료");
+        logger.info("💾 채팅 히스토리 저장 완료");
         return true;
     } catch (error) {
         await conn.rollback();
         conn.release();
-        console.error("❌ 채팅 히스토리 저장 오류:", error);
+        logger.error("❌ 채팅 히스토리 저장 오류:", error);
         return false;
     }
 }
@@ -32,10 +33,10 @@ const loadChatHistory = async (email) => {
             LIMIT 20
         `, [email]);
 
-        console.log(`📖 채팅 히스토리 로드 완료: ${email} (${rows.length}개 메시지)`);
+        logger.info(`📖 채팅 히스토리 로드 완료: ${email} (${rows.length}개 메시지)`);
         return rows;
     } catch (error) {
-        console.error("❌ 채팅 히스토리 로드 오류:", error);
+        logger.error("❌ 채팅 히스토리 로드 오류:", error);
         return [];
     }
 }
@@ -60,7 +61,7 @@ const loadServiceInfo = async () => {
             })
         );
 
-        console.log(`✅ 모든 서비스 정보 로드 완료: ${services.length}개 요금제`);
+        logger.info(`✅ 모든 서비스 정보 로드 완료: ${services.length}개 요금제`);
 
         // 서비스 정보 텍스트 생성
         let serviceInfo = "\n\n=== UMate 서비스 정보 ===\n\n";
@@ -100,19 +101,19 @@ const loadServiceInfo = async () => {
 
         serviceInfo += "=== 서비스 정보 끝 ===\n\n";
         
-        console.log(`📝 서비스 정보 텍스트 생성 완료: ${serviceInfo.length}자`);
+        logger.info(`📝 서비스 정보 텍스트 생성 완료: ${serviceInfo.length}자`);
         
         return serviceInfo;
         
     } catch (error) {
-        console.error('❌ 서비스 정보 로드 오류:', error);
+        logger.error('❌ 서비스 정보 로드 오류:', error);
         return "\n\n※ 현재 서비스 정보를 불러올 수 없습니다.\n\n";
     }
 }
 
 const loadPreviousChatToOpenAI = async (openaiWs, email, history = null) => {
     try {
-        console.log(`유저 정보 수집 시작 : ${email}`);
+        logger.info(`유저 정보 수집 시작 : ${email}`);
         if(email){
             const [userRows] = await db.query(`
                 SELECT *
@@ -125,7 +126,7 @@ const loadPreviousChatToOpenAI = async (openaiWs, email, history = null) => {
                 
                 // 🔥 서비스 정보도 함께 로드
                 const serviceInfo = await loadServiceInfo();
-                console.log(serviceInfo);
+                logger.info(serviceInfo);
                 
                 // 유저 정보 + 서비스 정보를 함께 전송
                 openaiWs.send(JSON.stringify({
@@ -146,13 +147,13 @@ ${serviceInfo}
                     },
                 }));
         
-                console.log(`✅ 유저 정보 + 서비스 정보 수집 완료 : ${user.NAME} (${user.EMAIL})`);
+                logger.info(`✅ 유저 정보 + 서비스 정보 수집 완료 : ${user.NAME} (${user.EMAIL})`);
             } else {
-                console.log(`유저 정보 없음: ${email}`);
+                logger.info(`유저 정보 없음: ${email}`);
                 
                 // 유저 정보가 없어도 서비스 정보는 제공
                 const serviceInfo = await loadServiceInfo();
-                console.log(serviceInfo);
+                logger.info(serviceInfo);
 
                 openaiWs.send(JSON.stringify({
                     type: 'conversation.item.create',
@@ -172,14 +173,14 @@ ${serviceInfo}
                     },
                 }));
                 
-                console.log(`✅ 게스트 사용자용 서비스 정보 제공 완료`);
+                logger.info(`✅ 게스트 사용자용 서비스 정보 제공 완료`);
             }
         }else{
-            console.log(`유저 정보 수집 완료 : 게스트`);
+            logger.info(`유저 정보 수집 완료 : 게스트`);
             
             // 게스트 사용자에게도 서비스 정보 제공
             const serviceInfo = await loadServiceInfo();
-            console.log(serviceInfo);
+            logger.info(serviceInfo);
 
             openaiWs.send(JSON.stringify({
                 type: 'conversation.item.create',
@@ -199,19 +200,19 @@ ${serviceInfo}
                 },
             }));
             
-            console.log(`✅ 게스트 사용자용 서비스 정보 제공 완료`);
+            logger.info(`✅ 게스트 사용자용 서비스 정보 제공 완료`);
         }
     } catch (error) {
-        console.error('❌ 유저 정보 수집 오류:', error);
+        logger.error('❌ 유저 정보 수집 오류:', error);
     }
     
     try {
-        console.log(`📚 이전 대화를 OpenAI conversation에 로드 시작: ${email}`);
+        logger.info(`📚 이전 대화를 OpenAI conversation에 로드 시작: ${email}`);
 
         const chatHistory = email ? await loadChatHistory(email) : history;
 
         if(chatHistory && chatHistory.length > 0){
-            console.log(`📖 ${chatHistory.length}개의 이전 메시지를 OpenAI에 추가`);
+            logger.info(`📖 ${chatHistory.length}개의 이전 메시지를 OpenAI에 추가`);
             chatHistory.forEach(msg => {
                 const isUser = msg.MESSAGE_TYPE === 'user';
                 const content = [];
@@ -241,12 +242,12 @@ ${serviceInfo}
                     }
                 }));
             });
-            console.log(`✅ 이전 대화 로드 완료: OpenAI가 이제 ${chatHistory.length}개 메시지의 컨텍스트를 기억함`);
+            logger.info(`✅ 이전 대화 로드 완료: OpenAI가 이제 ${chatHistory.length}개 메시지의 컨텍스트를 기억함`);
         }else{
-            console.log(`📝 새로운 세션: 로드할 이전 대화가 없음`);
+            logger.info(`📝 새로운 세션: 로드할 이전 대화가 없음`);
         }
     } catch (error) {
-        console.error('❌ 이전 대화 로드 오류:', error);
+        logger.error('❌ 이전 대화 로드 오류:', error);
     }
 }
 
@@ -268,7 +269,7 @@ const setUpContext = async (email) => {
                 if (user.PHONE_PLAN) context.push(`현재 요금제: ${user.PHONE_PLAN}`);
             }
         } catch (error) {
-            console.error('❌ 사용자 컨텍스트 구성 오류:', error);
+            logger.error('❌ 사용자 컨텍스트 구성 오류:', error);
         }
     }
     return context.join('\n');

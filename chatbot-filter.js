@@ -1,3 +1,5 @@
+const logger = require("./log");
+
 // 🚫 욕설 및 부적절한 단어 목록
 const INAPPROPRIATE_WORDS = [
     // 욕설
@@ -67,12 +69,12 @@ const checkServiceRelevance = (message) => {
 
 // 🔍 종합 메시지 필터
 const filterMessage = (message) => {
-    console.log(`🔍 메시지 필터링 시작: "${message}"`);
+    logger.info(`🔍 메시지 필터링 시작: "${message}"`);
     
     // 1. 부적절한 내용 체크
     const inappropriateCheck = checkInappropriateContent(message);
     if (inappropriateCheck.isInappropriate) {
-        console.log(`🚫 부적절한 내용 감지: ${inappropriateCheck.detectedWord}`);
+        logger.info(`🚫 부적절한 내용 감지: ${inappropriateCheck.detectedWord}`);
         return {
             allowed: false,
             reason: inappropriateCheck.reason,
@@ -85,7 +87,7 @@ const filterMessage = (message) => {
     // 2. 서비스 관련성 체크
     const relevanceCheck = checkServiceRelevance(message);
     if (!relevanceCheck.isRelevant) {
-        console.log(`📋 서비스 무관 메시지: 점수 ${relevanceCheck.score}/${relevanceCheck.threshold}`);
+        logger.info(`📋 서비스 무관 메시지: 점수 ${relevanceCheck.score}/${relevanceCheck.threshold}`);
         return {
             allowed: false,
             reason: '서비스와 무관한 내용',
@@ -96,7 +98,7 @@ const filterMessage = (message) => {
         };
     }
     
-    console.log(`✅ 메시지 필터링 통과: 관련성 점수 ${relevanceCheck.score}`);
+    logger.info(`✅ 메시지 필터링 통과: 관련성 점수 ${relevanceCheck.score}`);
     return {
         allowed: true,
         relevanceScore: relevanceCheck.score,
@@ -117,7 +119,7 @@ const getFilterStats = () => {
 const addInappropriateWord = (word) => {
     if (!INAPPROPRIATE_WORDS.includes(word)) {
         INAPPROPRIATE_WORDS.push(word);
-        console.log(`🚫 부적절한 단어 추가: ${word}`);
+        logger.info(`🚫 부적절한 단어 추가: ${word}`);
         return true;
     }
     return false;
@@ -126,7 +128,7 @@ const addInappropriateWord = (word) => {
 const addServiceKeyword = (keyword) => {
     if (!SERVICE_KEYWORDS.includes(keyword)) {
         SERVICE_KEYWORDS.push(keyword);
-        console.log(`📋 서비스 키워드 추가: ${keyword}`);
+        logger.info(`📋 서비스 키워드 추가: ${keyword}`);
         return true;
     }
     return false;
@@ -136,7 +138,7 @@ const removeInappropriateWord = (word) => {
     const index = INAPPROPRIATE_WORDS.indexOf(word);
     if (index > -1) {
         INAPPROPRIATE_WORDS.splice(index, 1);
-        console.log(`🚫 부적절한 단어 제거: ${word}`);
+        logger.info(`🚫 부적절한 단어 제거: ${word}`);
         return true;
     }
     return false;
@@ -146,7 +148,7 @@ const removeServiceKeyword = (keyword) => {
     const index = SERVICE_KEYWORDS.indexOf(keyword);
     if (index > -1) {
         SERVICE_KEYWORDS.splice(index, 1);
-        console.log(`📋 서비스 키워드 제거: ${keyword}`);
+        logger.info(`📋 서비스 키워드 제거: ${keyword}`);
         return true;
     }
     return false;
