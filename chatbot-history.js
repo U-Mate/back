@@ -1,15 +1,22 @@
 const { db } = require("./db");
 
 const saveChatHistory = async (email, messageType, message, audioData = null, contextInfo = null) => {
+    const conn = await db.getConnection();
+    await conn.beginTransaction();
+
     try {
-        const [rows] = await db.query(`
+        await conn.query(`
             INSERT INTO CHAT_HISTORY (EMAIL, MESSAGE_TYPE, MESSAGE, AUDIO_DATA, CONTEXT_INFO) 
             VALUES (?, ?, ?, ?, ?)
         `, [email, messageType, message, audioData, contextInfo]);
 
+        await conn.commit();
+        conn.release();
         console.log("💾 채팅 히스토리 저장 완료");
         return true;
     } catch (error) {
+        await conn.rollback();
+        conn.release();
         console.error("❌ 채팅 히스토리 저장 오류:", error);
         return false;
     }
