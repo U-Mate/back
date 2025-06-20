@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>🎤 UMate AI - 음성 + 텍스트 채팅</title>
+    <meta charset="UTF-8" />
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+      }
+      .container {
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 25px 70px rgba(0, 0, 0, 0.15);
+        overflow: hidden;
+      }
+      .header {
+        background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+        color: white;
+        padding: 25px;
+        text-align: center;
+      }
+      .header h1 {
+        margin: 0;
+        font-size: 28px;
+        font-weight: bold;
+      }
+      .header p {
+        margin: 15px 0 0 0;
+        opacity: 0.9;
+        font-size: 16px;
+      }
+      .features {
+        background: rgba(255, 255, 255, 0.1);
+        padding: 10px;
+        margin-top: 15px;
+        border-radius: 10px;
+        font-size: 12px;
+      }
+      #status {
+        padding: 18px;
+        text-align: center;
+        font-weight: bold;
+        transition: all 0.3s ease;
+        font-size: 16px;
+      }
+      .status-connecting {
+        background: #fff3cd;
+        color: #856404;
+      }
+      .status-connected {
+        background: #d4edda;
+        color: #155724;
+      }
+      .status-error {
+        background: #f8d7da;
+        color: #721c24;
+      }
+      .status-recording {
+        background: #cce5ff;
+        color: #004085;
+        animation: pulse 1s infinite;
+      }
+
+      .main-content {
+        display: flex;
+        height: 600px;
+      }
+
+      #chatContainer {
+        flex: 1;
+        overflow-y: auto;
+        padding: 25px;
+        background: #f8f9fa;
+      }
+
+      .voice-panel {
+        width: 300px;
+        background: #f1f3f4;
+        border-left: 1px solid #e9ecef;
+        padding: 25px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .voice-controls {
+        background: white;
+        padding: 20px;
+        border-radius: 15px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+
+      .voice-controls h3 {
+        margin: 0 0 15px 0;
+        color: #333;
+        font-size: 18px;
+      }
+
+      #recordButton {
+        width: 100%;
+        padding: 15px;
+        font-size: 16px;
+        font-weight: bold;
+        border: none;
+        border-radius: 25px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        margin-bottom: 15px;
+      }
+
+      .record-idle {
+        background: linear-gradient(135deg, #28a745, #20c997);
+        color: white;
+      }
+
+      .record-active {
+        background: linear-gradient(135deg, #dc3545, #fd7e14);
+        color: white;
+        animation: pulse 1s infinite;
+      }
+
+      .record-processing {
+        background: #6c757d;
+        color: white;
+        cursor: not-allowed;
+      }
+
+      .voice-selector {
+        margin-top: 15px;
+      }
+
+      .voice-selector label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 500;
+        color: #555;
+      }
+
+      .voice-selector select {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        background: white;
+      }
+
+      .input-area {
+        padding: 25px;
+        background: white;
+        border-top: 1px solid #e9ecef;
+      }
+
+      .input-group {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+
+      #messageInput {
+        flex: 1;
+        padding: 15px 20px;
+        border: 2px solid #e9ecef;
+        border-radius: 25px;
+        font-size: 16px;
+        outline: none;
+        transition: border-color 0.3s ease;
+      }
+
+      #messageInput:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      }
+
+      #sendButton {
+        padding: 15px 30px;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        border: none;
+        border-radius: 25px;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 16px;
+        transition: transform 0.2s ease;
+      }
+
+      #sendButton:hover {
+        transform: translateY(-2px);
+      }
+      #sendButton:disabled {
+        background: #6c757d;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .controls {
+        display: flex;
+        gap: 12px;
+        margin-top: 15px;
+        flex-wrap: wrap;
+      }
+
+      .btn-secondary {
+        padding: 10px 20px;
+        background: #6c757d;
+        color: white;
+        border: none;
+        border-radius: 20px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: background 0.2s ease;
+      }
+
+      .btn-secondary:hover {
+        background: #545b62;
+      }
+
+      .message {
+        margin: 20px 0;
+        padding: 15px 20px;
+        border-radius: 20px;
+        max-width: 85%;
+        word-wrap: break-word;
+        animation: slideIn 0.4s ease;
+        position: relative;
+      }
+
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(15px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.7;
+        }
+      }
+
+      .user {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        margin-left: auto;
+        text-align: right;
+      }
+
+      .assistant {
+        background: white;
+        border: 2px solid #e9ecef;
+        color: #333;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+      }
+
+      .system {
+        background: linear-gradient(135deg, #ffeaa7, #fdcb6e);
+        color: #2d3436;
+        text-align: center;
+        margin: 15px auto;
+        max-width: 90%;
+        font-weight: 500;
+      }
+
+      .typing {
+        background: #e9ecef;
+        color: #6c757d;
+        font-style: italic;
+        animation: pulse 1.5s ease-in-out infinite;
+      }
+
+      .streaming {
+        background: linear-gradient(135deg, #74b9ff, #0984e3);
+        color: white;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .streaming::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          rgba(255, 255, 255, 0.2),
+          transparent
+        );
+        animation: shimmer 2s infinite;
+      }
+
+      @keyframes shimmer {
+        0% {
+          left: -100%;
+        }
+        100% {
+          left: 100%;
+        }
+      }
+
+      .transcription {
+        background: #e8f4fd;
+        color: #0c5460;
+        border-left: 4px solid #17a2b8;
+        font-style: italic;
+      }
+
+      @media (max-width: 768px) {
+        .main-content {
+          flex-direction: column;
+          height: auto;
+        }
+
+        .voice-panel {
+          width: 100%;
+          order: -1;
+        }
+
+        #chatContainer {
+          height: 400px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>🎤 UMate AI Assistant</h1>
+        <p>음성 + 텍스트 멀티모달 대화</p>
+        <div class="features">
+          ✨ 실시간 음성 인식 • 🔊 AI 음성 답변 • 💬 텍스트 동시 지원 • ⚡
+          초고속 응답
+        </div>
+      </div>
+
+      <div id="status" class="status-connecting">연결 중...</div>
+
+      <div class="main-content">
+        <div id="chatContainer"></div>
+
+        <div class="voice-panel">
+          <div class="voice-controls">
+            <h3>🎤 음성 제어</h3>
+            <button id="recordButton" class="record-idle">
+              음성으로 질문하기
+            </button>
+
+            <div class="voice-selector">
+              <label for="voiceSelect">AI 음성 선택:</label>
+              <select id="voiceSelect">
+                <option value="alloy">Alloy (기본)</option>
+                <option value="echo">Echo</option>
+                <option value="fable">Fable</option>
+                <option value="onyx">Onyx</option>
+                <option value="nova">Nova</option>
+                <option value="shimmer">Shimmer</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="voice-controls">
+            <h3>📊 상태</h3>
+            <div id="micStatus">🎤 마이크 대기 중</div>
+            <div id="audioStatus">🔊 스피커 준비됨</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="input-area">
+        <div class="input-group">
+          <input
+            type="text"
+            id="messageInput"
+            placeholder="텍스트로 메시지를 입력하거나 음성 버튼을 사용하세요..."
+            disabled
+          />
+          <button id="sendButton" disabled>전송</button>
+        </div>
+        <div class="controls">
+          <button class="btn-secondary" onclick="clearChat()">
+            대화 초기화
+          </button>
+          <button class="btn-secondary" onclick="reconnect()">재연결</button>
+          <button class="btn-secondary" onclick="testAudio()">
+            오디오 테스트
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const chatContainer = document.getElementById("chatContainer");
+      const messageInput = document.getElementById("messageInput");
+      const sendButton = document.getElementById("sendButton");
+      const status = document.getElementById("status");
+      const recordButton = document.getElementById("recordButton");
+      const voiceSelect = document.getElementById("voiceSelect");
+      const micStatus = document.getElementById("micStatus");
+      const audioStatus = document.getElementById("audioStatus");
+
+      const sessionId = "realtime_" + Date.now();
+      let ws;
+      let currentStreamingMessage = null;
+      let streamingText = "";
+      let audioContext;
+      let mediaRecorder;
+      let audioChunks = [];
+      let isRecording = false;
+      let isConnected = false;
+
+      // 오디오 컨텍스트 초기화
+      async function initAudio() {
+        try {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)(
+            { sampleRate: 16000 }
+          );
+          audioStatus.textContent = "🔊 오디오 준비됨";
+          return true;
+        } catch (error) {
+          console.error("오디오 초기화 오류:", error);
+          audioStatus.textContent = "❌ 오디오 오류";
+          return false;
+        }
+      }
+
+      // 마이크 권한 요청
+      async function requestMicPermission() {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              sampleRate: 16000,
+              channelCount: 1,
+              echoCancellation: true,
+              noiseSuppression: true,
+            },
+          });
+
+          mediaRecorder = new MediaRecorder(stream);
+          micStatus.textContent = "🎤 마이크 준비됨";
+
+          mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+              audioChunks.push(event.data);
+            }
+          };
+
+          mediaRecorder.onstop = async () => {
+            const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+            const arrayBuffer = await audioBlob.arrayBuffer();
+            const audioData = await audioContext.decodeAudioData(arrayBuffer);
+
+            // PCM16 변환
+            const pcm16 = convertToPCM16(audioData);
+            const base64Audio = arrayBufferToBase64(pcm16);
+
+            // 음성 데이터 전송
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.send(
+                JSON.stringify({
+                  type: "audio_data",
+                  audio: base64Audio,
+                })
+              );
+
+              setTimeout(() => {
+                ws.send(
+                  JSON.stringify({
+                    type: "audio_commit",
+                  })
+                );
+              }, 100);
+            }
+
+            audioChunks = [];
+          };
+
+          return true;
+        } catch (error) {
+          console.error("마이크 권한 오류:", error);
+          micStatus.textContent = "❌ 마이크 접근 불가";
+          alert(
+            "마이크 권한이 필요합니다. 브라우저 설정에서 마이크 권한을 허용해주세요."
+          );
+          return false;
+        }
+      }
+
+      // PCM16 변환 함수
+      function convertToPCM16(audioBuffer) {
+        const inputData = audioBuffer.getChannelData(0);
+        const outputData = new Int16Array(inputData.length);
+
+        for (let i = 0; i < inputData.length; i++) {
+          const sample = Math.max(-1, Math.min(1, inputData[i]));
+          outputData[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+        }
+
+        return outputData.buffer;
+      }
+
+      // ArrayBuffer를 Base64로 변환
+      function arrayBufferToBase64(buffer) {
+        const bytes = new Uint8Array(buffer);
+        let binary = "";
+        for (let i = 0; i < bytes.byteLength; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        return btoa(binary);
+      }
+
+      // Base64를 ArrayBuffer로 변환
+      function base64ToArrayBuffer(base64) {
+        const binaryString = atob(base64);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        return bytes.buffer;
+      }
+
+      // 음성 재생
+      async function playAudio(base64Audio) {
+        try {
+          const arrayBuffer = base64ToArrayBuffer(base64Audio);
+          const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+          const source = audioContext.createBufferSource();
+          source.buffer = audioBuffer;
+          source.connect(audioContext.destination);
+          source.start();
+          audioStatus.textContent = "🔊 음성 재생 중...";
+
+          source.onended = () => {
+            audioStatus.textContent = "🔊 음성 재생 완료";
+          };
+        } catch (error) {
+          console.error("음성 재생 오류:", error);
+          audioStatus.textContent = "❌ 재생 오류";
+        }
+      }
+
+      // 상태 업데이트
+      function updateStatus(text, className) {
+        status.textContent = text;
+        status.className = className;
+      }
+
+      // WebSocket 연결
+      function connect() {
+        updateStatus("연결 중...", "status-connecting");
+        ws = new WebSocket(
+          `ws://localhost:3002/ws/realtime-chat?sessionId=${sessionId}`
+        );
+
+        ws.onopen = () => {
+          console.log("WebSocket 연결됨");
+        };
+
+        ws.onmessage = async (event) => {
+          const data = JSON.parse(event.data);
+
+          switch (data.type) {
+            case "connection":
+              if (data.status === "connected") {
+                updateStatus("✅ 음성+텍스트 채팅 준비됨", "status-connected");
+                messageInput.disabled = false;
+                sendButton.disabled = false;
+                recordButton.disabled = false;
+                isConnected = true;
+                addMessage(data.message, "system");
+
+                // 오디오 초기화
+                await initAudio();
+                await requestMicPermission();
+              } else {
+                updateStatus("❌ 연결 끊김", "status-error");
+                messageInput.disabled = true;
+                sendButton.disabled = true;
+                recordButton.disabled = true;
+                isConnected = false;
+              }
+              break;
+
+            case "speech_started":
+              updateStatus("🎤 음성 인식 중...", "status-recording");
+              break;
+
+            case "speech_stopped":
+              updateStatus("🔄 음성 처리 중...", "status-connecting");
+              break;
+
+            case "transcription_complete":
+              addMessage('🎤 "' + data.transcription + '"', "transcription");
+              break;
+
+            case "assistant_message_start":
+              if (currentStreamingMessage) {
+                currentStreamingMessage.remove();
+              }
+              streamingText = "";
+              currentStreamingMessage = addMessage(
+                "답변을 생성하고 있습니다...",
+                "typing"
+              );
+              break;
+
+            case "text_delta":
+              streamingText += data.delta;
+              if (currentStreamingMessage) {
+                if (currentStreamingMessage.classList.contains("typing")) {
+                  currentStreamingMessage.remove();
+                  currentStreamingMessage = addMessage("", "streaming");
+                }
+                currentStreamingMessage.textContent = streamingText;
+              }
+              break;
+
+            case "audio_delta":
+              // 실시간 음성 재생
+              if (data.audio) {
+                await playAudio(data.audio);
+              }
+              break;
+
+            case "audio_transcript_delta":
+              // 음성 응답의 텍스트 버전
+              streamingText += data.delta;
+              if (currentStreamingMessage) {
+                if (currentStreamingMessage.classList.contains("typing")) {
+                  currentStreamingMessage.remove();
+                  currentStreamingMessage = addMessage("", "streaming");
+                }
+                currentStreamingMessage.textContent = streamingText;
+              }
+              break;
+
+            case "text_done":
+            case "audio_transcript_done":
+              if (currentStreamingMessage) {
+                currentStreamingMessage.className = "message assistant";
+                currentStreamingMessage.textContent =
+                  data.text || data.transcript;
+              }
+              break;
+
+            case "response_complete":
+              if (currentStreamingMessage) {
+                currentStreamingMessage.className = "message assistant";
+              }
+              currentStreamingMessage = null;
+              streamingText = "";
+              sendButton.disabled = false;
+              recordButton.disabled = false;
+              updateStatus("✅ 응답 완료", "status-connected");
+              break;
+
+            case "error":
+              addMessage("❌ 오류: " + data.error, "system");
+              sendButton.disabled = false;
+              recordButton.disabled = false;
+              if (currentStreamingMessage) {
+                currentStreamingMessage.remove();
+                currentStreamingMessage = null;
+              }
+              break;
+          }
+        };
+
+        ws.onclose = () => {
+          updateStatus("❌ 연결 끊김 - 재연결 시도 중...", "status-error");
+          messageInput.disabled = true;
+          sendButton.disabled = true;
+          recordButton.disabled = true;
+          isConnected = false;
+
+          setTimeout(connect, 3000);
+        };
+
+        ws.onerror = (error) => {
+          console.error("WebSocket 오류:", error);
+          updateStatus("❌ 연결 오류", "status-error");
+        };
+      }
+
+      // 메시지 추가
+      function addMessage(content, role) {
+        const messageDiv = document.createElement("div");
+        messageDiv.className = "message " + role;
+        messageDiv.textContent = content;
+        chatContainer.appendChild(messageDiv);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+        return messageDiv;
+      }
+
+      // 텍스트 메시지 전송
+      function sendMessage() {
+        const message = messageInput.value.trim();
+        if (!message || !ws || ws.readyState !== WebSocket.OPEN) return;
+
+        addMessage(message, "user");
+        messageInput.value = "";
+        sendButton.disabled = true;
+
+        ws.send(
+          JSON.stringify({
+            type: "user_message",
+            message: message,
+          })
+        );
+      }
+
+      // 음성 녹음 토글
+      function toggleRecording() {
+        if (!isConnected || !mediaRecorder) return;
+
+        if (!isRecording) {
+          // 녹음 시작
+          mediaRecorder.start();
+          isRecording = true;
+          recordButton.textContent = "🛑 녹음 중... (클릭해서 중단)";
+          recordButton.className = "record-active";
+          updateStatus("🎤 음성 녹음 중...", "status-recording");
+          micStatus.textContent = "🔴 녹음 중...";
+        } else {
+          // 녹음 중단
+          mediaRecorder.stop();
+          isRecording = false;
+          recordButton.textContent = "처리 중...";
+          recordButton.className = "record-processing";
+          recordButton.disabled = true;
+          updateStatus("🔄 음성 처리 중...", "status-connecting");
+          micStatus.textContent = "🔄 처리 중...";
+
+          setTimeout(() => {
+            recordButton.textContent = "음성으로 질문하기";
+            recordButton.className = "record-idle";
+            recordButton.disabled = false;
+            micStatus.textContent = "🎤 마이크 준비됨";
+          }, 1000);
+        }
+      }
+
+      // 음성 변경
+      function changeVoice() {
+        const voice = voiceSelect.value;
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(
+            JSON.stringify({
+              type: "voice_change",
+              voice: voice,
+            })
+          );
+        }
+      }
+
+      // 대화 초기화
+      function clearChat() {
+        if (confirm("대화를 초기화하시겠습니까?")) {
+          chatContainer.innerHTML = "";
+          addMessage("대화가 초기화되었습니다.", "system");
+        }
+      }
+
+      // 재연결
+      function reconnect() {
+        if (ws) {
+          ws.close();
+        }
+        connect();
+      }
+
+      // 오디오 테스트
+      function testAudio() {
+        if (audioContext) {
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+
+          oscillator.frequency.value = 440;
+          gainNode.gain.value = 0.1;
+
+          oscillator.start();
+          oscillator.stop(audioContext.currentTime + 0.2);
+
+          audioStatus.textContent = "🔊 테스트 완료";
+        }
+      }
+
+      // 이벤트 리스너
+      sendButton.addEventListener("click", sendMessage);
+      recordButton.addEventListener("click", toggleRecording);
+      voiceSelect.addEventListener("change", changeVoice);
+
+      messageInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter" && !sendButton.disabled) {
+          sendMessage();
+        }
+      });
+
+      // 페이지 로드 시 연결 시작
+      connect();
+    </script>
+  </body>
+</html>
