@@ -2,6 +2,7 @@
 // 2)요금제 상세 정보 조회(리뷰포함)
 // 3)요금제 필터링 조회
 // 4)요금제 변경
+// 5) 연령대별 추천 요금제 조회
 
 const db = require("./db");
 
@@ -249,9 +250,78 @@ const changeUserPlan = async (req, res) => {
   }
 };
 
+//  5) 연령대별 추천 요금제 조회
+
+const recommendPlansByAge = async (req, res) => {
+  const { userId, birthday } = req.body;
+  if (!userId || !birthday) {
+    return res
+      .status(400)
+      .json({ success: false, error: "userId와 birthday를 모두 보내주세요." });
+  }
+
+  // 1) 나이 계산 (만 나이)
+  const birthDate = new Date(birthday);
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const m = today.getMonth() - birthDate.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+
+  // 2) 앞자리(10의 자리) 구하기 (70 이상은 70대)
+  let decade = Math.floor(age / 10) * 10;
+  if (decade >= 70) decade = 70;
+
+  const conn = await db.getConnection();
+  await conn.beginTransaction();
+  try {
+    // 3) 연령대에 속한 사용자들의 리뷰로 집계: 평균 별점 내림차순 상위 5개
+    let sql = `
+      SELECT
+        pr.PLAN_ID,
+        ROUND(AVG(pr.STAR_RATING), 1)          AS avg_rating,
+        COUNT(pr.REVIEW_ID)                    AS review_count
+      FROM ChatBot.PLAN_REVIEW pr
+      JOIN ChatBot.USER              u  ON pr.USER_ID = u.ID
+      WHERE
+    `;
+    const params = [];
+
+    if (decade === 70) {
+      sql += ` TIMESTAMPDIFF(YEAR, u.BIRTHDAY, CURDATE()) >= ? `;
+      params.push(70);
+    } else {
+      sql += ` TIMESTAMPDIFF(YEAR, u.BIRTHDAY, CURDATE()) BETWEEN ? AND ? `;
+      params.push(decade, decade + 9);
+    }
+
+    sql += `
+      GROUP BY pr.PLAN_ID
+      ORDER BY avg_rating DESC, review_count DESC
+      LIMIT 5
+    `;
+
+    const [rows] = await conn.query(sql, params);
+
+    await conn.commit();
+    conn.release();
+    const planIds = rows.map((r) => r.PLAN_ID);
+    return res.json({ success: true, data: planIds });
+  } catch (err) {
+    console.error(err);
+    await conn.rollback();
+    conn.release();
+    return res
+      .status(500)
+      .json({ success: false, error: "Failed to recommend plans." });
+  }
+};
+
 module.exports = {
   getPlanList,
   getPlanDetail,
   filterPlans,
   changeUserPlan,
+  recommendPlansByAge,
 };
