@@ -2,12 +2,11 @@
 // 2)요금제 상세 정보 조회(리뷰포함)
 // 3)요금제 필터링 조회
 // 4)요금제 변경
-// 5) 연령대별 추천 요금제 조회
+// 5)연령대별 맞춤 요금제 조회
 
 const db = require("./db");
 
 //  1) 전체 요금제 리스트 조회
-
 const getPlanList = async (req, res) => {
   const conn = await db.getConnection();
   await conn.beginTransaction();
@@ -38,14 +37,14 @@ const getPlanList = async (req, res) => {
     console.error(err);
     await conn.rollback();
     conn.release();
-    return res
-      .status(500)
-      .json({ success: false, error: "Failed to fetch plan list." });
+    return res.status(500).json({
+      success: false,
+      error: "요금제 리스트를 가져오는데 실패했습니다.",
+    });
   }
 };
 
 //  2) 요금제 상세 정보 조회
-
 const getPlanDetail = async (req, res) => {
   const { planId } = req.params;
   const conn = await db.getConnection();
@@ -74,7 +73,9 @@ const getPlanDetail = async (req, res) => {
     const plan = plans[0];
     if (!plan) {
       conn.release();
-      return res.status(404).json({ success: false, error: "Plan not found." });
+      return res
+        .status(404)
+        .json({ success: false, error: "해당 요금제를 찾지 못 했습니다." });
     }
 
     // 혜택 목록 조회
@@ -113,14 +114,14 @@ const getPlanDetail = async (req, res) => {
     console.error(err);
     await conn.rollback();
     conn.release();
-    return res
-      .status(500)
-      .json({ success: false, error: "Failed to fetch plan detail." });
+    return res.status(500).json({
+      success: false,
+      error: "요금제 상세 정보를 가져오지 못 했습니다.",
+    });
   }
 };
 
 //  3) 요금제 필터링 조회
-
 const filterPlans = async (req, res) => {
   const { ageGroup, minFee, maxFee, dataType, benefitIds } = req.body;
   const benefitIdArr = benefitIds
@@ -194,12 +195,11 @@ const filterPlans = async (req, res) => {
     conn.release();
     return res
       .status(500)
-      .json({ success: false, error: "Failed to filter plans." });
+      .json({ success: false, error: "요금제 필터링에 실패했습니다." });
   }
 };
 
 //  4) 요금제 변경
-
 const changeUserPlan = async (req, res) => {
   const { userId, newPlanId } = req.body;
   const conn = await db.getConnection();
@@ -213,7 +213,9 @@ const changeUserPlan = async (req, res) => {
     );
     if (!userRows.length) {
       conn.release();
-      return res.status(404).json({ success: false, error: "User not found." });
+      return res
+        .status(404)
+        .json({ success: false, error: "유저를 찾을 수 없습니다." });
     }
     const oldPlanId = userRows[0].PHONE_PLAN;
 
@@ -239,19 +241,18 @@ const changeUserPlan = async (req, res) => {
 
     await conn.commit();
     conn.release();
-    return res.json({ success: true, message: "Plan changed successfully." });
+    return res.json({ success: true, message: "요금제 변경에 성공했습니다." });
   } catch (err) {
     console.error(err);
     await conn.rollback();
     conn.release();
     return res
       .status(500)
-      .json({ success: false, error: "Failed to change plan." });
+      .json({ success: false, error: "요금제 변경이 실패했습니다." });
   }
 };
 
-//  5) 연령대별 추천 요금제 조회
-
+//  5) 연령대별 맞춤 요금제 조회
 const recommendPlansByAge = async (req, res) => {
   const { userId, birthday } = req.body;
   if (!userId || !birthday) {
@@ -260,61 +261,50 @@ const recommendPlansByAge = async (req, res) => {
       .json({ success: false, error: "userId와 birthday를 모두 보내주세요." });
   }
 
-  // 1) 나이 계산 (만 나이)
-  const birthDate = new Date(birthday);
-  const today = new Date();
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const m = today.getMonth() - birthDate.getMonth();
-  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-    age--;
-  }
-
-  // 2) 앞자리(10의 자리) 구하기 (70 이상은 70대)
-  let decade = Math.floor(age / 10) * 10;
-  if (decade >= 70) decade = 70;
+  const birthYear = new Date(birthday).getFullYear();
+  const decadeStart = Math.floor(birthYear / 10) * 10;
+  const start = new Date(decadeStart, 0, 1, 0, 0, 0);
+  const end = new Date(decadeStart + 9, 11, 31, 23, 59, 59);
 
   const conn = await db.getConnection();
   await conn.beginTransaction();
   try {
-    // 3) 연령대에 속한 사용자들의 리뷰로 집계: 평균 별점 내림차순 상위 5개
-    let sql = `
+    const sql = `
       SELECT
-        pr.PLAN_ID,
-        ROUND(AVG(pr.STAR_RATING), 1)          AS avg_rating,
-        COUNT(pr.REVIEW_ID)                    AS review_count
+        pi.ID                AS planId,
+        pi.NAME              AS name,
+        pi.MONTHLY_FEE       AS monthlyFee,
+        pi.DATA_INFO         AS dataInfo,
+        pi.SHARE_DATA        AS shareData,
+        ROUND(AVG(pr.STAR_RATING), 1) AS avgRating,
+        COUNT(pr.REVIEW_ID)           AS reviewCount
       FROM ChatBot.PLAN_REVIEW pr
-      JOIN ChatBot.USER              u  ON pr.USER_ID = u.ID
-      WHERE
-    `;
-    const params = [];
-
-    if (decade === 70) {
-      sql += ` TIMESTAMPDIFF(YEAR, u.BIRTHDAY, CURDATE()) >= ? `;
-      params.push(70);
-    } else {
-      sql += ` TIMESTAMPDIFF(YEAR, u.BIRTHDAY, CURDATE()) BETWEEN ? AND ? `;
-      params.push(decade, decade + 9);
-    }
-
-    sql += `
-      GROUP BY pr.PLAN_ID
-      ORDER BY avg_rating DESC, review_count DESC
+      JOIN ChatBot.USER u
+        ON pr.USER_ID = u.ID
+      JOIN ChatBot.PLAN_INFO pi
+        ON pr.PLAN_ID = pi.ID
+      WHERE u.BIRTHDAY BETWEEN ? AND ?
+      GROUP BY
+        pi.ID, pi.NAME, pi.MONTHLY_FEE, pi.DATA_INFO, pi.SHARE_DATA
+      ORDER BY
+        avgRating DESC,
+        reviewCount DESC
       LIMIT 5
     `;
 
-    const [rows] = await conn.query(sql, params);
+    const [rows] = await conn.query(sql, [start, end]);
 
     await conn.commit();
     conn.release();
-    const planIds = rows.map((r) => r.PLAN_ID);
-    return res.json({ success: true, data: planIds });
+
+    return res.json({ success: true, data: rows });
   } catch (err) {
     console.error(err);
     await conn.rollback();
     conn.release();
     return res
       .status(500)
-      .json({ success: false, error: "Failed to recommend plans." });
+      .json({ success: false, error: "맞춤 요금제 찾기에 실패했습니다." });
   }
 };
 
