@@ -1,6 +1,7 @@
-//요즘제 리스트 조회(리뷰포함)
-//요금제 상세 정보 조회(리뷰포함)
-//요금제 필터링 조회
+// 1)요즘제 리스트 조회(리뷰포함)
+// 2)요금제 상세 정보 조회(리뷰포함)
+// 3)요금제 필터링 조회
+// 4)요금제 변경
 
 const db = require("./db");
 
@@ -196,8 +197,61 @@ const filterPlans = async (req, res) => {
   }
 };
 
+//  4) 요금제 변경
+
+const changeUserPlan = async (req, res) => {
+  const { userId, newPlanId } = req.body;
+  const conn = await db.getConnection();
+  await conn.beginTransaction();
+
+  try {
+    // 현재 사용 중인 요금제 조회
+    const [userRows] = await conn.query(
+      `SELECT PHONE_PLAN FROM USER WHERE ID = ?`,
+      [userId]
+    );
+    if (!userRows.length) {
+      conn.release();
+      return res.status(404).json({ success: false, error: "User not found." });
+    }
+    const oldPlanId = userRows[0].PHONE_PLAN;
+
+    // USER 테이블 업데이트
+    await conn.query(`UPDATE USER SET PHONE_PLAN = ? WHERE ID = ?`, [
+      newPlanId,
+      userId,
+    ]);
+
+    // PLAN_INFO에서 기존 요금제 USER_COUNT 감소
+    if (oldPlanId) {
+      await conn.query(
+        `UPDATE PLAN_INFO SET USER_COUNT = USER_COUNT - 1 WHERE ID = ? AND USER_COUNT > 0`,
+        [oldPlanId]
+      );
+    }
+
+    // PLAN_INFO에서 변경 요금제 USER_COUNT 증가
+    await conn.query(
+      `UPDATE PLAN_INFO SET USER_COUNT = USER_COUNT + 1 WHERE ID = ?`,
+      [newPlanId]
+    );
+
+    await conn.commit();
+    conn.release();
+    return res.json({ success: true, message: "Plan changed successfully." });
+  } catch (err) {
+    console.error(err);
+    await conn.rollback();
+    conn.release();
+    return res
+      .status(500)
+      .json({ success: false, error: "Failed to change plan." });
+  }
+};
+
 module.exports = {
   getPlanList,
   getPlanDetail,
   filterPlans,
+  changeUserPlan,
 };
