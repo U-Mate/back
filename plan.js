@@ -252,59 +252,78 @@ const changeUserPlan = async (req, res) => {
   }
 };
 
-//  5) 연령대별 맞춤 요금제 조회
+// 5) 연령대별 맞춤 요금제 조회
 const recommendPlansByAge = async (req, res) => {
   const { userId, birthday } = req.body;
+
   if (!userId || !birthday) {
-    return res
-      .status(400)
-      .json({ success: false, error: "userId와 birthday를 모두 보내주세요." });
+    return res.status(400).json({
+      success: false,
+      error: "userId와 birthday를 모두 보내주세요.",
+    });
   }
 
   const birthYear = new Date(birthday).getFullYear();
-  const decadeStart = Math.floor(birthYear / 10) * 10;
-  const start = new Date(decadeStart, 0, 1, 0, 0, 0);
-  const end = new Date(decadeStart + 9, 11, 31, 23, 59, 59);
+  const thisYear = new Date().getFullYear();
+  const age = thisYear - birthYear;
+  let ageGroup = Math.floor(age / 10) * 10;
+  if (ageGroup >= 70) ageGroup = 70;
+
+  //연령대별 DATE 범위 구하기
+  const startYear = thisYear - ageGroup - 9;
+  const endYear = thisYear - ageGroup;
+
+  const startDate = `${startYear}-01-01`;
+  const endDate = `${endYear}-12-31`;
 
   const conn = await db.getConnection();
   await conn.beginTransaction();
+
   try {
-    const sql = `
+    let sql = `
       SELECT
-        pi.ID                AS planId,
-        pi.NAME              AS name,
-        pi.MONTHLY_FEE       AS monthlyFee,
-        pi.DATA_INFO         AS dataInfo,
-        pi.SHARE_DATA        AS shareData,
-        ROUND(AVG(pr.STAR_RATING), 1) AS avgRating,
-        COUNT(pr.REVIEW_ID)           AS reviewCount
+        pi.ID                        AS planId,
+        pi.NAME                      AS name,
+        pi.MONTHLY_FEE               AS monthlyFee,
+        pi.DATA_INFO                 AS dataInfo,
+        pi.SHARE_DATA                AS shareData,
+        ROUND(AVG(pr.STAR_RATING),1) AS avgRating,
+        COUNT(pr.REVIEW_ID)          AS reviewCount
       FROM ChatBot.PLAN_REVIEW pr
-      JOIN ChatBot.USER u
-        ON pr.USER_ID = u.ID
-      JOIN ChatBot.PLAN_INFO pi
-        ON pr.PLAN_ID = pi.ID
-      WHERE u.BIRTHDAY BETWEEN ? AND ?
-      GROUP BY
-        pi.ID, pi.NAME, pi.MONTHLY_FEE, pi.DATA_INFO, pi.SHARE_DATA
-      ORDER BY
-        avgRating DESC,
-        reviewCount DESC
+      JOIN ChatBot.USER       u  ON u.ID  = pr.USER_ID
+      JOIN ChatBot.PLAN_INFO  pi ON pi.ID = pr.PLAN_ID
+      WHERE
+    `;
+
+    const params = [];
+
+    if (ageGroup === 70) {
+      sql += ` u.BIRTHDAY <= ? `;
+      params.push(endDate);
+    } else {
+      sql += ` u.BIRTHDAY BETWEEN ? AND ? `;
+      params.push(startDate, endDate);
+    }
+
+    sql += `
+      GROUP BY pi.ID, pi.NAME, pi.MONTHLY_FEE, pi.DATA_INFO, pi.SHARE_DATA
+      ORDER BY avgRating DESC, reviewCount DESC
       LIMIT 5
     `;
 
-    const [rows] = await conn.query(sql, [start, end]);
+    const [rows] = await conn.query(sql, params);
 
     await conn.commit();
     conn.release();
-
     return res.json({ success: true, data: rows });
   } catch (err) {
     console.error(err);
     await conn.rollback();
     conn.release();
-    return res
-      .status(500)
-      .json({ success: false, error: "맞춤 요금제 찾기에 실패했습니다." });
+    return res.status(500).json({
+      success: false,
+      error: "맞춤 요금제 찾기에 실패했습니다.",
+    });
   }
 };
 
