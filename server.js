@@ -76,7 +76,7 @@ app.post('/login', async (req, res) => await login(req, res));
 app.post('/logout', async (req, res) => await logout(req, res));
 
 // 토큰 체크(검증 및 갱신)
-app.post('/tokenCheck', authenticateToken, async (req, res) => await tokenCheck(req, res));
+app.get('/tokenCheck', authenticateToken, async (req, res) => await tokenCheck(req, res));
 
 // 유저 정보 조회
 app.post('/userInfo', async (req, res) => await getUserInfo(req, res));

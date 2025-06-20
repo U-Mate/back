@@ -4,7 +4,7 @@
 
 ## 🚀 기본 정보
 
-- **Base URL**: `https://yourdomain.com`
+- **Base URL**: `https://seungwoo.i234.me:3333`
 - **Protocol**: HTTPS Only
 - **Authentication**: JWT (Cookie-based)
 - **Content-Type**: `application/json`
@@ -364,7 +364,7 @@
 </details>
 
 <details>
-<summary><strong>POST /tokenCheck</strong> - 토큰 검증 🔒</summary>
+<summary><strong>GET /tokenCheck</strong> - 토큰 검증 🔒</summary>
 
 **설명**: JWT 토큰 검증 및 자동 갱신
 
@@ -1014,8 +1014,7 @@ document.getElementById("send-button").onclick = () => {
 ## 📞 지원 정보
 
 - **API 버전**: v1.0.0
-- **문서 업데이트**: 2024년 12월
-- **개발팀 문의**: support@umate.com
+- **문서 업데이트**: 2025년 06월
 - **기술 지원**: 평일 09:00-18:00
 
 ---
