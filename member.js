@@ -312,7 +312,7 @@ const withDrawal = async (req, res) => {
 
     try {
 
-        const [rows] = await db.query('SELECT * FROM USER WHERE EMAIL = ?', [email]);
+        const [rows] = await conn.query('SELECT * FROM USER WHERE EMAIL = ?', [email]);
 
         if(rows.length === 0){
             await conn.rollback();
@@ -382,18 +382,18 @@ const login = async (req, res) => {
             const valid = await argon2.verify(rows[0].PASSWORD, password);
 
             if(!valid){
-                await db.query('UPDATE USER SET FAIL_CNT = ? WHERE EMAIL = ?', [rows[0].FAIL_CNT + 1, email]);
+                await conn.query('UPDATE USER SET FAIL_CNT = ? WHERE EMAIL = ?', [rows[0].FAIL_CNT + 1, email]);
                 await conn.commit();
                 conn.release();
                 console.error(`${id} 패스워드가 일치하지않습니다.`);
                 return res.status(404).json({success : false, message : "로그인에 실패했습니다."});
             }
 
-            await db.query('UPDATE USER SET FAIL_CNT = ? WHERE EMAIL = ?', [0, email]);
+            await conn.query('UPDATE USER SET FAIL_CNT = ? WHERE EMAIL = ?', [0, email]);
 
             const token = jwt.sign({email}, jwtSecret, {expiresIn : '30m'});
 
-            await db.query('INSERT INTO TOKEN(EMAIL, TOKEN) VALUES(?, ?) ON DUPLICATE KEY UPDATE TOKEN = ?', [email, token, token]);
+            await conn.query('INSERT INTO TOKEN(EMAIL, TOKEN) VALUES(?, ?) ON DUPLICATE KEY UPDATE TOKEN = ?', [email, token, token]);
 
             res.cookie('token', token, {
                 httpOnly : true,
@@ -425,7 +425,7 @@ const logout = async (req, res) => {
     await conn.beginTransaction();
 
     try {
-        const [rows] = await db.query('SELECT * FROM TOKEN WHERE EMAIL = ?', [email]);
+        const [rows] = await conn.query('SELECT * FROM TOKEN WHERE EMAIL = ?', [email]);
 
         if(rows.length === 0){
             await conn.rollback();
@@ -434,7 +434,7 @@ const logout = async (req, res) => {
             return res.status(404).json({success : false, message : "비정상적인 접근입니다."});
         }
 
-        await db.query('DELETE FROM TOKEN WHERE EMAIL = ?', [email]);
+        await conn.query('DELETE FROM TOKEN WHERE EMAIL = ?', [email]);
 
         res.clearCookie('token', {
             httpOnly : true,
@@ -464,7 +464,7 @@ const tokenCheck = async (req, res) => {
     await conn.beginTransaction();
 
     try {
-        const [rows] = await db.query('SELECT * FROM TOKEN WHERE EMAIL = ?', [email.email]);
+        const [rows] = await conn.query('SELECT * FROM TOKEN WHERE EMAIL = ?', [email.email]);
 
         if(rows.length === 0){
             await conn.rollback();
@@ -475,7 +475,7 @@ const tokenCheck = async (req, res) => {
 
         const newToken = jwt.sign(email, jwtSecret, {expiresIn : '30m'});
 
-        await db.query('UPDATE TOKEN SET TOKEN = ? WHERE EMAIL = ?', [newToken, email.email]);
+        await conn.query('UPDATE TOKEN SET TOKEN = ? WHERE EMAIL = ?', [newToken, email.email]);
 
         res.cookie('token', newToken, {
             httpOnly : true,
