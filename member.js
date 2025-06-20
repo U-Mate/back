@@ -394,7 +394,7 @@ const login = async (req, res) => {
             conn.release();
 
             console.log(`${email} 로그인 성공`);
-            return res.status(200).json({success : true, name : rows[0].NAME, plan : rows[0].PHONE_PLAN, birthDay : rows[0].BIRTHDAY, message : "로그인에 성공했습니다."});
+            return res.status(200).json({success : true, id : rows[0].ID, name : rows[0].NAME, plan : rows[0].PHONE_PLAN, birthDay : rows[0].BIRTHDAY, message : "로그인에 성공했습니다."});
         }
     } catch (error) {
         await conn.rollback();
@@ -540,6 +540,7 @@ const authenticateToken = async (req, res, next) => {
     }
 }
 
+// 유저 상세 정보 조회
 const getUserInfo = async (req, res) => {
     const { email, password } = req.body;
 
