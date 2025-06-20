@@ -139,7 +139,19 @@ const checkAuth = async (req, res) => {
     await conn.beginTransaction();
 
     try {
-        const [rows] = await conn.query('SELECT * FROM AUTHENTICATION WHERE EMAIL = ? AND USE_NOT = "N" AND timestampdiff(minute, CREATE_AT, now()) <= 5 ORDER BY ID DESC LIMIT 1', [email]);
+        const [rows] = await conn.query(`
+            SELECT *
+            FROM
+            (
+                SELECT *
+                FROM AUTHENTICATION
+                WHERE EMAIL = ?
+                AND USE_NOT = "N"
+                ORDER BY ID DESC
+                LIMIT 1
+            ) A
+            WHERE timestampdiff(minute, A.CREATE_AT, now()) <= 5
+            `, [email]);
 
         if(rows.length === 0 || rows[0].AUTH !== auth){
             await conn.rollback();
