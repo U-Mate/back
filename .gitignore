@@ -11,6 +11,14 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
 # Runtime data
 pids
 *.pid
@@ -28,6 +36,16 @@ coverage/
 .lock-wscript
 
 # Compiled binary addons
+# Grunt intermediate storage (https://gruntjs.com/creating-plugins#storing-task-files)
+.grunt
+
+# Bower dependency directory (https://bower.io/)
+bower_components
+
+# node-waf configuration
+.lock-wscript
+
+# Compiled binary addons (https://nodejs.org/api/addons.html)
 build/Release
 
 # Dependency directories
@@ -56,6 +74,17 @@ jspm_packages/
 .nuxt
 
 # Vuepress build output
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# next.js build output
+.next
+
+# nuxt.js build output
+.nuxt
+
+# vuepress build output
 .vuepress/dist
 
 # Serverless directories
@@ -107,3 +136,14 @@ bower_components
 
 # Compiled binary addons
 build/Release 
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.temp 

@@ -4,8 +4,6 @@ const express = require("express");
 const expressWs = require('express-ws');
 const WebSocket = require('ws');
 const axios = require('axios');
-const jwt = require("jsonwebtoken");
-const jwtSecret = process.env.JWT_SECRET;
 const cookieParser = require('cookie-parser');
 
 const app = express();
