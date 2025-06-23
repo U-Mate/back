@@ -56,10 +56,20 @@ const signUp = async (req, res) => {
             parallelism : Number(process.env.PARALLELISM)
         });
 
-        await conn.query('INSERT INTO USER(NAME, GENDER, BIRTHDAY, PHONE_NUMBER, PHONE_PLAN, EMAIL, PASSWORD) VALUES(?, ?, ?, ?, ?, ?, ?)', [name, gender, birthDay, phoneNumber, phonePlan, email, hashPassword]);
+        const [planRows] = await conn.query('SELECT * FROM PLAN_INFO WHERE ID = ?', [phonePlan]);
+        if(planRows.length === 0){
+            await conn.rollback();
+            conn.release();
+            logger.error("존재하지 않는 요금제입니다.");
+            return res.status(404).json({success : false, error : "존재하지 않는 요금제입니다."});
+        }
 
-        const [rows] = await conn.query('SELECT * FROM PHONE_PLAN WHERE ID = ?', [phonePlan]);
-        await conn.query('UPDATE USER SET USER_COUNT = ? WHERE ID = ?', [rows[0].USER_COUNT + 1, phonePlan]);
+        const membership = planRows[0].MONTHLY_FEE >= 74800 ? `${planRows[0].MONTHLY_FEE >= 95000 ? "V" : ""}VIP` : "우수";
+
+        await conn.query('INSERT INTO USER(NAME, GENDER, BIRTHDAY, PHONE_NUMBER, PHONE_PLAN, MEMBERSHIP, EMAIL, PASSWORD) VALUES(?, ?, ?, ?, ?, ?, ?, ?)', [name, gender, birthDay, phoneNumber, phonePlan, membership, email, hashPassword]);
+
+        const [rows] = await conn.query('SELECT * FROM PLAN_INFO WHERE ID = ?', [phonePlan]);
+        await conn.query('UPDATE PLAN_INFO SET USER_COUNT = ? WHERE ID = ?', [rows[0].USER_COUNT + 1, phonePlan]);
         await conn.commit();
         conn.release();
         logger.info(`${email} 회원가입 성공`);
@@ -106,12 +116,19 @@ const emailAuth = async (req, res) => {
             return res.status(404).json({success : false, error : "올바르지못한 형식입니다."});
         }
 
+        const [rows] = await conn.query('SELECT * FROM USER WHERE EMAIL = ?', [email]);
+        if(rows.length > 0){
+            conn.release();
+            logger.error("이미 존재하는 이메일입니다.");
+            return res.status(404).json({success : false, error : "이미 존재하는 이메일입니다."});
+        }
+
         // 보안 강화장치
         const buf = randomBytes(6); // 48비트 암호학적 난수 생성
         const num = buf.readUIntBE(0, 6) / 2**48;
-        const value = Math.floor(num * 10000);
+        const value = Math.floor(num * 1000000);
 
-        const auth = String(value).padStart(4, '0');
+        const auth = String(value).padStart(6, '0');
 
         await conn.query('INSERT INTO AUTHENTICATION(EMAIL, AUTH) VALUES(?, ?)', [email, auth]);
 
@@ -394,7 +411,7 @@ const login = async (req, res) => {
 
             await conn.query('UPDATE USER SET FAIL_CNT = ? WHERE EMAIL = ?', [0, email]);
 
-            const token = jwt.sign({email}, jwtSecret, {expiresIn : '30m'});
+            const token = jwt.sign({ email, id : rows[0].ID, name : rows[0].NAME, plan : rows[0].PHONE_PLAN, membership : rows[0].MEMBERSHIP, birthDay : rows[0].BIRTHDAY }, jwtSecret, {expiresIn : '30m'});
 
             await conn.query('INSERT INTO TOKEN(EMAIL, TOKEN) VALUES(?, ?) ON DUPLICATE KEY UPDATE TOKEN = ?', [email, token, token]);
 
@@ -410,7 +427,7 @@ const login = async (req, res) => {
             conn.release();
 
             logger.info(`${email} 로그인 성공`);
-            return res.status(200).json({success : true, id : rows[0].ID, name : rows[0].NAME, plan : rows[0].PHONE_PLAN, birthDay : rows[0].BIRTHDAY, message : "로그인에 성공했습니다."});
+            return res.status(200).json({success : true, message : "로그인에 성공했습니다."});
         }
     } catch (error) {
         await conn.rollback();
@@ -461,7 +478,7 @@ const logout = async (req, res) => {
 
 // 토큰 갱신
 const tokenCheck = async (req, res) => {
-    const email = { email : req.user.email };
+    const payload = { email : req.user.email, id : req.user.id, name : req.user.name, plan : req.user.plan, membership : req.user.membership, birthDay : req.user.birthDay };
 
     const conn = await db.getConnection();
     await conn.beginTransaction();
@@ -483,7 +500,7 @@ const tokenCheck = async (req, res) => {
             return res.status(404).json({success : false, error : "비정상적인 접근입니다."});
         }
 
-        const newToken = jwt.sign(email, jwtSecret, {expiresIn : '30m'});
+        const newToken = jwt.sign(payload, jwtSecret, {expiresIn : '30m'});
 
         await conn.query('UPDATE TOKEN SET TOKEN = ? WHERE EMAIL = ?', [newToken, email.email]);
 

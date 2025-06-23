@@ -14,7 +14,7 @@
 ## 📑 목차
 
 - [🔐 사용자 인증](#-사용자-인증) (13개 API)
-- [📱 요금제 관리](#-요금제-관리) (5개 API)
+- [📱 요금제 관리](#-요금제-관리) (6개 API)
 - [⭐ 리뷰 시스템](#-리뷰-시스템) (4개 API)
 - [🤖 AI 채팅봇](#-ai-채팅봇) (2개 API)
 - [📋 공통 정보](#-공통-정보)
@@ -36,7 +36,7 @@
 {
   "name": "홍길동",
   "gender": "M",
-  "birthDay": "1990-01-01",
+  "birthDay": "19900101",
   "phoneNumber": "01012345678",
   "email": "user@example.com",
   "password": "password123!",
@@ -82,7 +82,7 @@
   "id": 1,
   "name": "홍길동",
   "plan": 1,
-  "birthDay": "1990-01-01T00:00:00.000Z",
+  "birthDay": "19900101",
   "message": "로그인에 성공했습니다."
 }
 ```
@@ -323,7 +323,7 @@
   "success": true,
   "name": "홍길동",
   "gender": "M",
-  "birthDay": "1990-01-01T00:00:00.000Z",
+  "birthDay": "19900101",
   "phoneNumber": "01012345678",
   "phonePlan": 1,
   "email": "user@example.com",
@@ -424,6 +424,53 @@
 </details>
 
 <details>
+<summary><strong>GET /planSimple/:planId</strong> - 요금제 기본정보</summary>
+
+**설명**: 특정 요금제의 기본 정보만을 간단히 조회합니다.
+
+**Parameters:**
+
+- `planId`: 요금제 ID (URL 경로)
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "ID": 1,
+      "NAME": "청춘요금제",
+      "MONTHLY_FEE": 35000,
+      "CALL_INFO": "무제한",
+      "CALL_INFO_DETAIL": "무제한 음성통화",
+      "SMS_INFO": "무제한",
+      "DATA_INFO": "10GB",
+      "DATA_INFO_DETAIL": "10GB 데이터 + 속도제한",
+      "SHARE_DATA": "Y",
+      "AGE_GROUP": "20대",
+      "USER_COUNT": 150,
+      "RECEIVED_STAR_COUNT": 750,
+      "REVIEW_USER_COUNT": 200
+    }
+  ]
+}
+```
+
+**Error Codes:**
+
+- `404`: 해당 요금제를 찾지 못했습니다.
+- `500`: 요금제 간단 조회 중 오류가 발생했습니다.
+
+**특징:**
+
+- 혜택이나 리뷰 없이 요금제 기본 정보만 반환
+- `/planDetail`보다 빠른 응답 속도
+- 간단한 요금제 정보가 필요한 경우 사용
+
+</details>
+
+<details>
 <summary><strong>GET /planDetail/:planId</strong> - 요금제 상세정보</summary>
 
 **설명**: 특정 요금제의 상세 정보 (혜택, 리뷰 포함)
@@ -513,7 +560,7 @@
 
 ```json
 {
-  "birthday": "1990-01-01"
+  "birthday": "19900101"
 }
 ```
 
@@ -596,13 +643,10 @@
   "message": "내 리뷰 조회 성공",
   "reviews": [
     {
-      "REVIEW_ID": 1,
       "USER_ID": 1,
       "PLAN_ID": 1,
       "STAR_RATING": 5,
-      "REVIEW_CONTENT": "정말 좋은 요금제입니다!",
-      "CREATED_AT": "2024-01-01T00:00:00.000Z",
-      "UPDATED_AT": "2024-01-01T00:00:00.000Z"
+      "REVIEW_CONTENT": "정말 좋은 요금제입니다!"
     }
   ]
 }
@@ -852,8 +896,8 @@ wss://yourdomain.com/realtime-chat?sessionId=123&email=user@example.com&history=
 | 이메일    | 유효한 이메일 형식      | `user@example.com`   |
 | 휴대폰    | 11자리 숫자             | `01012345678`        |
 | 비밀번호  | 최소 8자, 특수문자 포함 | `password123!`       |
-| 생년월일  | YYYY-MM-DD 형식         | `1990-01-01`         |
-| 리뷰 평점 | 0~5 사이 정수           | `4`                  |
+| 생년월일  | YYYYMMDD 형식           | `19900101`           |
+| 리뷰 평점 | 0~5 사이 소수점 1자리   | `4`, `2.5`           |
 | 리뷰 내용 | 10~100자                | `좋은 요금제입니다!` |
 
 ### 개발 가이드
@@ -871,8 +915,8 @@ wss://yourdomain.com/realtime-chat?sessionId=123&email=user@example.com&history=
 }
 
 // API 요청 시 쿠키 포함 방법
-fetch('/api/tokenCheck', {
-  method: 'POST',
+fetch('/tokenCheck', {
+  method: 'GET',
   credentials: 'include'  // 쿠키 자동 포함
 });
 ```
@@ -914,7 +958,7 @@ async function apiRequest(url, options = {}) {
 
 // 사용 예시
 try {
-  const result = await apiRequest("/api/login", {
+  const result = await apiRequest("/login", {
     body: JSON.stringify({ id: "user@example.com", password: "password123!" }),
   });
 
@@ -938,7 +982,7 @@ class ChatbotClient {
   }
 
   connect() {
-    const wsUrl = `wss://yourdomain.com/realtime-chat?email=${this.email}&history=true`;
+    const wsUrl = `wss://seungwoo.i234.me:3333/realtime-chat?email=${this.email}&history=true`;
     this.ws = new WebSocket(wsUrl);
 
     this.ws.onopen = () => {

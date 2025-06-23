@@ -6,13 +6,12 @@ const expressWs = require('express-ws');
 const cookieParser = require('cookie-parser');
 
 const app = express();
-expressWs(app);
 const cors = require("cors");
 
 const { signUp, phoneNumberDuplicate, emailAuth, checkAuth, getUserInfo, tokenCheck, logout, login, withDrawal, passwordChange, passwordReset, passwordCheck, phoneNumberCheck, authenticateToken } = require('./member');
 const { realtime, connections } = require('./chatbot');
 const { getMyReview, createReview, updateReview, deleteReview } = require('./review');
-const { getPlanList, getPlanDetail, filterPlans, changeUserPlan, recommendPlansByAge } = require('./plan');
+const { getPlanList, getPlanDetail, filterPlans, changeUserPlan, recommendPlansByAge, getPlanSimple } = require('./plan');
 const logger = require('./log');
 
 app.use(express.json());
@@ -32,6 +31,12 @@ const options = {
     cert : fs.readFileSync(process.env.HTTPS_CERT),
     ca : fs.readFileSync(process.env.HTTPS_CA),
 };
+
+// HTTPS 서버 생성
+const server = https.createServer(options, app);
+
+// WebSocket을 HTTPS 서버에 연결
+expressWs(app, server);
 
 // chat bot
 app.ws('/realtime-chat', (clientWs, req) => realtime(clientWs, req));
@@ -107,6 +112,9 @@ app.post('/deleteReview', async (req, res) => await deleteReview(req, res));
 // 전체 요금제 조회
 app.get('/planList', async (req, res) => await getPlanList(req, res));
 
+// 요금제 간단 조회
+app.get('/planSimple/:planId', async (req, res) => await getPlanSimple(req, res));
+
 // 요금제 상세 정보 조회
 app.get('/planDetail/:planId', async (req, res) => await getPlanDetail(req, res));
 
@@ -119,4 +127,4 @@ app.post('/changeUserPlan', async (req, res) => await changeUserPlan(req, res));
 // 요금제 추천
 app.post('/recommendPlansByAge', async (req, res) => await recommendPlansByAge(req, res));
 
-https.createServer(options, app).listen(process.env.PORT, () => logger.info("서버가 연결되었습니다."));
+server.listen(process.env.PORT, () => logger.info("서버가 연결되었습니다."));
