@@ -3,6 +3,7 @@ const WebSocket = require('ws');
 const axios = require('axios');
 const { loadPreviousChatToOpenAI, loadChatHistory, saveChatHistory, setUpContext } = require('./chatbot-history');
 const { filterMessage } = require('./chatbot-filter');
+const logger = require('./log');
 
 // 사용자별 연결 저장
 const userConnections = new Map();
@@ -11,10 +12,10 @@ const userConnections = new Map();
 const realtime = (clientWs, req) => {
   const sessionId = req.query.sessionId || `session_${Date.now()}_${Math.random()}`;
   const userEmail = req.query.email;
-  console.log(`🔗 새로운 Realtime 연결: ${sessionId}, 사용자: ${userEmail || '게스트'}`);
+  logger.info(`🔗 새로운 Realtime 연결: ${sessionId}, 사용자: ${userEmail || '게스트'}`);
 
   // OpenAI Realtime API 연결
-  console.log(`🔑 OpenAI API 키 확인: ${process.env.CHATBOT_API ? '설정됨' : '없음'}`);
+  logger.info(`🔑 OpenAI API 키 확인: ${process.env.CHATBOT_API ? '설정됨' : '없음'}`);
   
   const openaiWs = new WebSocket('wss://api.openai.com/v1/realtime?model=gpt-4o-mini-realtime-preview-2024-12-17', {
     headers: {
@@ -23,13 +24,13 @@ const realtime = (clientWs, req) => {
     }
   });
   
-  console.log(`🌐 OpenAI WebSocket 생성됨: ${sessionId}`);
+  logger.info(`🌐 OpenAI WebSocket 생성됨: ${sessionId}`);
 
   // 연결 저장
   userConnections.set(sessionId, { clientWs, openaiWs, userEmail });
   
   // 클라이언트 연결 상태 확인
-  console.log(`👤 클라이언트 WebSocket 상태: ${clientWs.readyState} (OPEN=${WebSocket.OPEN})`);
+  logger.info(`👤 클라이언트 WebSocket 상태: ${clientWs.readyState} (OPEN=${WebSocket.OPEN})`);
   
   // 즉시 클라이언트에 연결 확인 메시지 전송
   clientWs.send(JSON.stringify({
@@ -40,14 +41,14 @@ const realtime = (clientWs, req) => {
   }));
 
   // 🚨 클라이언트 메시지 핸들러를 여기로 이동 (OpenAI 연결과 독립적으로 작동)
-  console.log(`🎧 클라이언트 메시지 핸들러 등록 중... (세션: ${sessionId})`);
+  logger.info(`🎧 클라이언트 메시지 핸들러 등록 중... (세션: ${sessionId})`);
   
   // 클라이언트로부터 메시지 수신
   clientWs.on('message', async (message) => {
-    console.log(`📨 클라이언트로부터 메시지 수신 (세션: ${sessionId}):`, message.toString());
+    logger.info(`📨 클라이언트로부터 메시지 수신 (세션: ${sessionId}):`, message.toString());
     try {
       const data = JSON.parse(message);
-      console.log(`📋 파싱된 데이터:`, data);
+      logger.info(`📋 파싱된 데이터:`, data);
       
       switch (data.type) {
         case 'user_message':
@@ -55,7 +56,7 @@ const realtime = (clientWs, req) => {
           const filterResult = filterMessage(data.message);
           
           if (!filterResult.allowed) {
-            console.log(`🚫 메시지 차단됨: ${filterResult.reason} - "${data.message}"`);
+            logger.info(`🚫 메시지 차단됨: ${filterResult.reason} - "${data.message}"`);
             
             // 필터링된 메시지에 대한 응답을 클라이언트에 전송
             clientWs.send(JSON.stringify({
@@ -75,12 +76,12 @@ const realtime = (clientWs, req) => {
             }));
             
             // 🚫 필터링된 메시지는 DB에 저장하지 않음
-            console.log(`🗑️ 필터링된 메시지 DB 저장 건너뜀: "${data.message}"`);
+            logger.info(`🗑️ 필터링된 메시지 DB 저장 건너뜀: "${data.message}"`);
             
             return; // 더 이상 처리하지 않고 종료
           }
           
-          console.log(`✅ 메시지 필터링 통과: 관련성 점수 ${filterResult.relevanceScore}`);
+          logger.info(`✅ 메시지 필터링 통과: 관련성 점수 ${filterResult.relevanceScore}`);
           
           // 💾 사용자 메시지 히스토리 저장 (필터링 통과한 경우에만)
           if (userEmail) {
@@ -89,8 +90,8 @@ const realtime = (clientWs, req) => {
 
           // 🧠 최적화: 이전 대화는 이미 연결 시 OpenAI conversation에 로드됨
           // 따라서 현재 메시지만 Realtime API로 전송
-          console.log(`📝 사용자 메시지 수신: "${data.message}" (세션: ${sessionId})`);
-          console.log(`🔗 OpenAI 연결 상태: ${openaiWs.readyState} (OPEN=${WebSocket.OPEN})`);
+          logger.info(`📝 사용자 메시지 수신: "${data.message}" (세션: ${sessionId})`);
+          logger.info(`🔗 OpenAI 연결 상태: ${openaiWs.readyState} (OPEN=${WebSocket.OPEN})`);
           
           if (openaiWs.readyState === WebSocket.OPEN) {
             // ✨ 핵심 최적화: 새 메시지만 전송 (이전 대화는 이미 로드됨)
@@ -117,10 +118,10 @@ const realtime = (clientWs, req) => {
               }
             }));
 
-            console.log(`📤 OpenAI Realtime API로 메시지 전송: "${data.message}"`);
+            logger.info(`📤 OpenAI Realtime API로 메시지 전송: "${data.message}"`);
           } else {
             // Realtime API 연결이 안 된 경우 에러 처리
-            console.error('❌ OpenAI Realtime API 연결되지 않음');
+            logger.error('❌ OpenAI Realtime API 연결되지 않음');
             clientWs.send(JSON.stringify({
               type: 'error',
               error: 'OpenAI 연결이 준비되지 않았습니다. 잠시 후 다시 시도해주세요.'
@@ -179,10 +180,10 @@ const realtime = (clientWs, req) => {
           break;
 
         default:
-          console.log('알 수 없는 클라이언트 메시지 타입:', data.type);
+          logger.info('알 수 없는 클라이언트 메시지 타입:', data.type);
       }
     } catch (error) {
-      console.error('클라이언트 메시지 파싱 오류:', error);
+      logger.error('클라이언트 메시지 파싱 오류:', error);
       clientWs.send(JSON.stringify({
         type: 'error',
         error: '메시지 형식이 올바르지 않습니다.'
@@ -190,12 +191,12 @@ const realtime = (clientWs, req) => {
     }
   });
 
-  console.log(`✅ 클라이언트 메시지 핸들러 등록 완료 (세션: ${sessionId})`);
+  logger.info(`✅ 클라이언트 메시지 핸들러 등록 완료 (세션: ${sessionId})`);
 
   // OpenAI 연결 성공 시 세션 설정
   openaiWs.on('open', async () => {
-    console.log(`✅ OpenAI Realtime API 연결 성공: ${sessionId}`);
-    console.log(`🔗 OpenAI WebSocket 상태: ${openaiWs.readyState} (OPEN=${openaiWs.OPEN})`);
+    logger.info(`✅ OpenAI Realtime API 연결 성공: ${sessionId}`);
+    logger.info(`🔗 OpenAI WebSocket 상태: ${openaiWs.readyState} (OPEN=${openaiWs.OPEN})`);
     
     // 세션 설정 (음성 + 텍스트 지원)
     openaiWs.send(JSON.stringify({
@@ -254,15 +255,15 @@ const realtime = (clientWs, req) => {
   openaiWs.on('message', async (data) => {
     try {
       const event = JSON.parse(data.toString());
-      console.log(`📨 OpenAI 이벤트 수신: ${event.type} (세션: ${sessionId})`);
+      logger.info(`📨 OpenAI 이벤트 수신: ${event.type} (세션: ${sessionId})`);
       
       switch (event.type) {
         case 'session.created':
-          console.log('Realtime 세션 생성됨');
+          logger.info('Realtime 세션 생성됨');
           break;
 
         case 'session.updated':
-          console.log('Realtime 세션 업데이트됨');
+          logger.info('Realtime 세션 업데이트됨');
           break;
 
         case 'input_audio_buffer.speech_started':
@@ -290,7 +291,7 @@ const realtime = (clientWs, req) => {
             const audioFilterResult = filterMessage(userTranscript);
             
             if (!audioFilterResult.allowed) {
-              console.log(`🚫 음성 메시지 차단됨: ${audioFilterResult.reason} - "${userTranscript}"`);
+              logger.info(`🚫 음성 메시지 차단됨: ${audioFilterResult.reason} - "${userTranscript}"`);
               
               // 필터링된 음성 메시지 응답 전송
               clientWs.send(JSON.stringify({
@@ -312,7 +313,7 @@ const realtime = (clientWs, req) => {
               }));
               
               // 🚫 필터링된 음성 메시지는 DB에 저장하지 않음
-              console.log(`🗑️ 필터링된 음성 메시지 DB 저장 건너뜀: "${userTranscript}"`);
+              logger.info(`🗑️ 필터링된 음성 메시지 DB 저장 건너뜀: "${userTranscript}"`);
               
               // 음성 인식은 완료되었다고 클라이언트에 알림 (필터링 되었지만)
               clientWs.send(JSON.stringify({
@@ -325,7 +326,7 @@ const realtime = (clientWs, req) => {
               return; // 더 이상 처리하지 않고 종료
             }
             
-            console.log(`✅ 음성 메시지 필터링 통과: 관련성 점수 ${audioFilterResult.relevanceScore}`);
+            logger.info(`✅ 음성 메시지 필터링 통과: 관련성 점수 ${audioFilterResult.relevanceScore}`);
           }
           
           // 💾 사용자 음성 메시지 히스토리 저장
@@ -436,7 +437,7 @@ const realtime = (clientWs, req) => {
           break;
 
         case 'error':
-          console.error('OpenAI Realtime API 오류:', event.error);
+          logger.error('OpenAI Realtime API 오류:', event.error);
           clientWs.send(JSON.stringify({
             type: 'error',
             error: event.error.message || '알 수 없는 오류가 발생했습니다.'
@@ -451,15 +452,15 @@ const realtime = (clientWs, req) => {
           }));
       }
     } catch (error) {
-      console.error('OpenAI 메시지 파싱 오류:', error);
+      logger.error('OpenAI 메시지 파싱 오류:', error);
     }
   });
 
   // OpenAI 연결 오류
   openaiWs.on('error', (error) => {
-    console.error('❌ OpenAI Realtime API 연결 오류:', error);
-    console.error('❌ 오류 상세:', error.message, error.code);
-    console.error('❌ 전체 오류 객체:', JSON.stringify(error, null, 2));
+    logger.error('❌ OpenAI Realtime API 연결 오류:', error);
+    logger.error('❌ 오류 상세:', error.message, error.code);
+    logger.error('❌ 전체 오류 객체:', JSON.stringify(error, null, 2));
     clientWs.send(JSON.stringify({
       type: 'error',
       error: `OpenAI 연결 오류: ${error.message || '알 수 없는 오류'}`
@@ -468,8 +469,8 @@ const realtime = (clientWs, req) => {
 
   // OpenAI 연결 종료
   openaiWs.on('close', (code, reason) => {
-    console.log(`❌ OpenAI Realtime API 연결 종료: ${sessionId}`);
-    console.log(`❌ 종료 코드: ${code}, 이유: ${reason}`);
+    logger.info(`❌ OpenAI Realtime API 연결 종료: ${sessionId}`);
+    logger.info(`❌ 종료 코드: ${code}, 이유: ${reason}`);
     clientWs.send(JSON.stringify({
       type: 'connection',
       status: 'disconnected',
@@ -479,7 +480,7 @@ const realtime = (clientWs, req) => {
 
   // 클라이언트 연결 종료
   clientWs.on('close', (code, reason) => {
-    console.log(`🔌 클라이언트 연결 종료: ${sessionId}, 코드: ${code}, 이유: ${reason}`);
+    logger.info(`🔌 클라이언트 연결 종료: ${sessionId}, 코드: ${code}, 이유: ${reason}`);
     if (openaiWs.readyState === WebSocket.OPEN) {
       openaiWs.close();
     }
@@ -488,7 +489,7 @@ const realtime = (clientWs, req) => {
 
   // 클라이언트 연결 오류
   clientWs.on('error', (error) => {
-    console.error(`❌ 클라이언트 WebSocket 오류 (세션: ${sessionId}):`, error);
+    logger.error(`❌ 클라이언트 WebSocket 오류 (세션: ${sessionId}):`, error);
   });
 };
 
