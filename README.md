@@ -13,7 +13,7 @@
 
 ## 📑 목차
 
-- [🔐 사용자 인증](#-사용자-인증) (13개 API)
+- [🔐 사용자 인증](#-사용자-인증) (14개 API)
 - [📱 요금제 관리](#-요금제-관리) (5개 API)
 - [⭐ 리뷰 시스템](#-리뷰-시스템) (4개 API)
 - [🤖 AI 채팅봇](#-ai-채팅봇) (2개 API)
@@ -275,6 +275,35 @@
   "message": "사용가능한 휴대폰 번호입니다."
 }
 ```
+
+</details>
+
+<details>
+<summary><strong>POST /emailDuplicate</strong> - 이메일 중복확인</summary>
+
+**설명**: 이메일 주소 중복 여부를 확인합니다.
+
+**Request:**
+
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "사용가능한 이메일입니다."
+}
+```
+
+**Error Codes:**
+
+- `404`: 이미 존재하는 이메일입니다.
+- `500`: 이메일 확인 중 오류가 발생했습니다.
 
 </details>
 

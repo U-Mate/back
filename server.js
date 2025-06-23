@@ -8,7 +8,7 @@ const cookieParser = require('cookie-parser');
 const app = express();
 const cors = require("cors");
 
-const { signUp, phoneNumberDuplicate, emailAuth, checkAuth, getUserInfo, tokenCheck, logout, login, withDrawal, passwordChange, passwordReset, passwordCheck, phoneNumberCheck, authenticateToken } = require('./member');
+const { signUp, phoneNumberDuplicate, emailDuplicate, emailAuth, checkAuth, getUserInfo, tokenCheck, logout, login, withDrawal, passwordChange, passwordReset, passwordCheck, phoneNumberCheck, authenticateToken } = require('./member');
 const { realtime, connections } = require('./chatbot');
 const { getMyReview, createReview, updateReview, deleteReview } = require('./review');
 const { getPlanList, getPlanDetail, filterPlans, changeUserPlan, recommendPlansByAge } = require('./plan');
@@ -52,6 +52,9 @@ app.post('/signUp', async (req, res) => await signUp(req, res));
 
 // 휴대폰 중복확인
 app.post('/duplicateCheck', async (req, res) => await phoneNumberDuplicate(req, res));
+
+// 이메일 중복확인
+app.post('/emailDuplicate', async (req, res) => await emailDuplicate(req, res));
 
 // 이메일 인증
 app.post('/email', async (req, res) => await emailAuth(req, res));
