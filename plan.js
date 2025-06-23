@@ -49,37 +49,6 @@ const getPlanList = async (req, res) => {
   }
 };
 
-// 요금제 간단 조회
-const getPlanSimple = async (req, res) => {
-  const { planId } = req.params;
-
-  const conn = await db.getConnection();
-  await conn.beginTransaction();
-  try {
-    const [plans] = await conn.query(`
-      SELECT *
-      FROM ChatBot.PLAN_INFO
-      WHERE ID = ?
-    `, [planId]);
-
-    if(plans.length === 0){
-      conn.release();
-      logger.error(`${planId} 요금제를 찾지 못 했습니다.`);
-      return res.status(404).json({ success: false, error: "해당 요금제를 찾지 못 했습니다." });
-    }
-
-    await conn.commit();
-    conn.release();
-    logger.info(`${planId} 요금제 간단 조회 성공`);
-    return res.json({ success: true, data: plans });
-  } catch (err) {
-    await conn.rollback();
-    conn.release();
-    logger.error(err);
-    return res.status(500).json({ success: false, error: "요금제 간단 조회 중 오류가 발생했습니다." });
-  }
-}
-
 //  2) 요금제 상세 정보 조회
 const getPlanDetail = async (req, res) => {
   const { planId } = req.params;
@@ -402,7 +371,6 @@ const recommendPlansByAge = async (req, res) => {
 
 module.exports = {
   getPlanList,
-  getPlanSimple,
   getPlanDetail,
   filterPlans,
   changeUserPlan,

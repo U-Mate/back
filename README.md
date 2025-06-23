@@ -14,7 +14,7 @@
 ## 📑 목차
 
 - [🔐 사용자 인증](#-사용자-인증) (13개 API)
-- [📱 요금제 관리](#-요금제-관리) (6개 API)
+- [📱 요금제 관리](#-요금제-관리) (5개 API)
 - [⭐ 리뷰 시스템](#-리뷰-시스템) (4개 API)
 - [🤖 AI 채팅봇](#-ai-채팅봇) (2개 API)
 - [📋 공통 정보](#-공통-정보)
@@ -420,53 +420,6 @@
   ]
 }
 ```
-
-</details>
-
-<details>
-<summary><strong>GET /planSimple/:planId</strong> - 요금제 기본정보</summary>
-
-**설명**: 특정 요금제의 기본 정보만을 간단히 조회합니다.
-
-**Parameters:**
-
-- `planId`: 요금제 ID (URL 경로)
-
-**Response:**
-
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "ID": 1,
-      "NAME": "청춘요금제",
-      "MONTHLY_FEE": 35000,
-      "CALL_INFO": "무제한",
-      "CALL_INFO_DETAIL": "무제한 음성통화",
-      "SMS_INFO": "무제한",
-      "DATA_INFO": "10GB",
-      "DATA_INFO_DETAIL": "10GB 데이터 + 속도제한",
-      "SHARE_DATA": "Y",
-      "AGE_GROUP": "20대",
-      "USER_COUNT": 150,
-      "RECEIVED_STAR_COUNT": 750,
-      "REVIEW_USER_COUNT": 200
-    }
-  ]
-}
-```
-
-**Error Codes:**
-
-- `404`: 해당 요금제를 찾지 못했습니다.
-- `500`: 요금제 간단 조회 중 오류가 발생했습니다.
-
-**특징:**
-
-- 혜택이나 리뷰 없이 요금제 기본 정보만 반환
-- `/planDetail`보다 빠른 응답 속도
-- 간단한 요금제 정보가 필요한 경우 사용
 
 </details>
 

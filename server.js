@@ -11,7 +11,7 @@ const cors = require("cors");
 const { signUp, phoneNumberDuplicate, emailAuth, checkAuth, getUserInfo, tokenCheck, logout, login, withDrawal, passwordChange, passwordReset, passwordCheck, phoneNumberCheck, authenticateToken } = require('./member');
 const { realtime, connections } = require('./chatbot');
 const { getMyReview, createReview, updateReview, deleteReview } = require('./review');
-const { getPlanList, getPlanDetail, filterPlans, changeUserPlan, recommendPlansByAge, getPlanSimple } = require('./plan');
+const { getPlanList, getPlanDetail, filterPlans, changeUserPlan, recommendPlansByAge } = require('./plan');
 const logger = require('./log');
 
 app.use(express.json());
@@ -111,9 +111,6 @@ app.post('/deleteReview', async (req, res) => await deleteReview(req, res));
 
 // 전체 요금제 조회
 app.get('/planList', async (req, res) => await getPlanList(req, res));
-
-// 요금제 간단 조회
-app.get('/planSimple/:planId', async (req, res) => await getPlanSimple(req, res));
 
 // 요금제 상세 정보 조회
 app.get('/planDetail/:planId', async (req, res) => await getPlanDetail(req, res));
