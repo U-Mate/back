@@ -140,12 +140,8 @@ const getPlanDetail = async (req, res) => {
 const filterPlans = async (req, res) => {
   const { ageGroup, minFee, maxFee, dataType, benefitIds } = req.body;
   const benefitIdArr = benefitIds
-    ? benefitIds
-        .split(",")
-        .map((id) => Number(id))
-        .filter(Boolean)
+    ? benefitIds.split(",").map(Number).filter(Boolean)
     : [];
-
   const conn = await db.getConnection();
   await conn.beginTransaction();
   try {
@@ -156,19 +152,19 @@ const filterPlans = async (req, res) => {
         p.MONTHLY_FEE,
         p.CALL_INFO,
         p.DATA_INFO,
+        p.DATA_INFO_DETAIL,
         p.SHARE_DATA,
         p.AGE_GROUP
       FROM ChatBot.PLAN_INFO p
     `;
     const params = [];
     const whereClauses = [];
-
-    // 연령대 필터
+    /* ------------ ① 연령대 ------------ */
     if (ageGroup && ageGroup !== "전체대상" && ageGroup !== "상관없음") {
       whereClauses.push("p.AGE_GROUP = ?");
       params.push(ageGroup);
     }
-    // 요금 범위 필터
+    /* ------------ ② 요금 범위 ------------ */
     if (minFee != null) {
       whereClauses.push("p.MONTHLY_FEE >= ?");
       params.push(Number(minFee));
@@ -177,43 +173,53 @@ const filterPlans = async (req, res) => {
       whereClauses.push("p.MONTHLY_FEE <= ?");
       params.push(Number(maxFee));
     }
-    // 데이터 조건 필터
-    if (dataType && dataType !== "상관없음") {
-      whereClauses.push("p.DATA_INFO = ?");
-      params.push(dataType);
+    /* ------------ ③ 데이터 조건 ------------ */
+    if (dataType && dataType !== "상관없어요") {
+      if (dataType === "완전 무제한") {
+        // DATA_INFO 가 정확히 "데이터 무제한"
+        whereClauses.push("p.DATA_INFO = ?");
+        params.push("데이터 무제한");
+      } else if (dataType === "다쓰면 무제한") {
+        // DATA_INFO_DETAIL 이 null 이 아니거나 '+' 로 시작
+        whereClauses.push(
+          "(p.DATA_INFO_DETAIL IS NOT NULL AND p.DATA_INFO_DETAIL <> '' AND p.DATA_INFO_DETAIL LIKE '+%')"
+        );
+        // LIKE 패턴 자체에 ? 를 쓰면 '%' 를 붙여야 하지만, 여기서는 상수라 파라미터가 없습니다.
+      }
     }
-    // 혜택 필터
+    /* ------------ ④ 혜택 ------------ */
     if (benefitIdArr.length) {
       sql += ` JOIN ChatBot.PLAN_BENEFIT pb ON pb.PLAN_ID = p.ID `;
       const placeholders = benefitIdArr.map(() => "?").join(",");
       whereClauses.push(`pb.BENEFIT_ID IN (${placeholders})`);
       params.push(...benefitIdArr);
     }
-
+    /* ------------ ⑤ WHERE & GROUP BY ------------ */
     if (whereClauses.length) {
       sql += " WHERE " + whereClauses.join(" AND ");
     }
-
-    // 선택된 모든 혜택을 포함할 것
     if (benefitIdArr.length) {
       sql += " GROUP BY p.ID HAVING COUNT(DISTINCT pb.BENEFIT_ID) = ?";
       params.push(benefitIdArr.length);
     }
-
+    /* ------------ ⑥ 실행 ------------ */
     const [plans] = await conn.query(sql, params);
     await conn.commit();
     conn.release();
-
     logger.info(`${plans.length}개의 요금제 필터링 조회 성공`);
-    return res.json({ success: true, data: plans, message : `${plans.length}개의 요금제 필터링 조회 성공` });
+    return res.json({
+      success: true,
+      data: plans,
+      message: `${plans.length}개의 요금제 필터링 조회 성공`,
+    });
   } catch (err) {
     await conn.rollback();
     conn.release();
-
     logger.error(err);
-    return res
-      .status(500)
-      .json({ success: false, error: "요금제 필터링에 실패했습니다." });
+    return res.status(500).json({
+      success: false,
+      error: "요금제 필터링에 실패했습니다.",
+    });
   }
 };
 

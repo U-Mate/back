@@ -5,9 +5,11 @@
 ## 🚀 기본 정보
 
 - **Base URL**: `https://seungwoo.i234.me:3333`
-- **Protocol**: HTTPS Only
-- **Authentication**: JWT (Cookie-based)
+- **Protocol**: HTTPS Only (SSL/TLS 인증서 필수)
+- **Authentication**: JWT (Cookie-based, 30분 자동 갱신)
 - **Content-Type**: `application/json`
+- **WebSocket**: `/realtime-chat` (GPT-4o 기반 AI 챗봇)
+- **Logging**: Winston (일별 로그 분리, 14일 보관)
 
 ---
 
@@ -16,7 +18,7 @@
 - [🔐 사용자 인증](#-사용자-인증) (14개 API)
 - [📱 요금제 관리](#-요금제-관리) (5개 API)
 - [⭐ 리뷰 시스템](#-리뷰-시스템) (4개 API)
-- [🤖 AI 채팅봇](#-ai-채팅봇) (2개 API)
+- [🤖 AI 챗봇](#-ai-챗봇) (WebSocket + API)
 - [📋 공통 정보](#-공통-정보)
 
 ---
@@ -499,17 +501,17 @@
 <details>
 <summary><strong>POST /filterPlans</strong> - 요금제 필터링</summary>
 
-**설명**: 조건에 따른 요금제 필터링 검색
+**설명**: 다양한 조건으로 요금제를 필터링하여 검색합니다.
 
 **Request:**
 
 ```json
 {
-  "ageGroup": "20대", // optional
-  "minFee": 30000, // optional
-  "maxFee": 50000, // optional
-  "dataType": "무제한", // optional
-  "benefitIds": "1,2,3" // optional, 콤마로 구분
+  "ageGroup": "20대", // optional: 10대, 20대, 30대, 40대, 50대, 60대, 70대, 전체대상, 상관없음
+  "minFee": 30000, // optional: 최소 월 요금
+  "maxFee": 50000, // optional: 최대 월 요금
+  "dataType": "완전 무제한", // optional: "완전 무제한", "다쓰면 무제한", "상관없어요"
+  "benefitIds": "1,2,3" // optional: 혜택 ID 목록 (콤마로 구분, AND 조건)
 }
 ```
 
@@ -523,13 +525,24 @@
       "PLAN_ID": 1,
       "PLAN_NAME": "청춘요금제",
       "MONTHLY_FEE": 35000,
+      "CALL_INFO": "무제한",
       "DATA_INFO": "10GB",
+      "DATA_INFO_DETAIL": "+무제한 데이터 제공",
+      "SHARE_DATA": "Y",
       "AGE_GROUP": "20대"
     }
   ],
   "message": "3개의 요금제 필터링 조회 성공"
 }
 ```
+
+**특징:**
+
+- **복합 조건 검색**: 여러 조건을 동시에 만족하는 요금제만 반환
+- **데이터 타입 구분**:
+  - `완전 무제한`: DATA_INFO가 "데이터 무제한"인 요금제
+  - `다쓰면 무제한`: DATA_INFO_DETAIL에 추가 혜택(+)이 있는 요금제
+- **혜택 매칭**: 지정된 모든 혜택을 포함하는 요금제만 반환
 
 </details>
 
@@ -577,7 +590,7 @@
 <details>
 <summary><strong>POST /changeUserPlan</strong> - 요금제 변경</summary>
 
-**설명**: 사용자의 요금제를 변경합니다.
+**설명**: 사용자의 요금제를 변경하고 멤버십 등급을 자동으로 조정합니다.
 
 **Request:**
 
@@ -601,6 +614,15 @@
 
 - 기존 요금제 USER_COUNT 자동 감소
 - 새 요금제 USER_COUNT 자동 증가
+- **멤버십 등급 자동 결정**:
+  - 월 95,000원 이상: **VVIP**
+  - 월 74,800원 이상: **VIP**
+  - 그 외: **우수**
+
+**Error Cases:**
+
+- `404`: 유저 또는 요금제를 찾을 수 없음
+- `500`: 요금제 변경 실패
 
 </details>
 
@@ -734,7 +756,7 @@
 
 ---
 
-## 🤖 AI 채팅봇
+## 🤖 AI 챗봇
 
 <details>
 <summary><strong>WS /realtime-chat</strong> - 실시간 채팅 (WebSocket)</summary>
@@ -796,11 +818,15 @@ wss://yourdomain.com/realtime-chat?sessionId=123&email=user@example.com&history=
 
 **주요 기능:**
 
-- 💬 실시간 텍스트 채팅
-- 🎤 음성 인식 & 음성 응답
-- 🧠 대화 히스토리 자동 저장
-- 🔍 부적절한 메시지 필터링
-- 📱 요금제 데이터 실시간 연동
+- 💬 **실시간 텍스트 채팅**: 스트리밍 기반 즉시 응답
+- 🎤 **음성 인식 & 음성 응답**: 6가지 음성 스타일 지원 (alloy, echo, fable, onyx, nova, shimmer)
+- 🧠 **개인화된 대화**: 사용자 정보 + 전체 요금제 정보 자동 로드
+- 📚 **대화 히스토리**: 최근 20개 메시지 자동 저장/로드
+- 🔍 **지능형 메시지 필터링**:
+  - 부적절한 언어 차단 (욕설, 폭력적 표현 등)
+  - 서비스 무관 주제 차단 (학문, 요리, 영화 등)
+  - 음성/텍스트별 다른 필터링 기준 적용
+- 📱 **실시간 서비스 연동**: 모든 요금제 정보, 혜택, 리뷰 데이터 실시간 제공
 
 </details>
 
@@ -873,14 +899,14 @@ wss://yourdomain.com/realtime-chat?sessionId=123&email=user@example.com&history=
 
 ### 데이터 유효성 검증
 
-| 항목      | 검증 규칙               | 예시                 |
-| --------- | ----------------------- | -------------------- |
-| 이메일    | 유효한 이메일 형식      | `user@example.com`   |
-| 휴대폰    | 11자리 숫자             | `01012345678`        |
-| 비밀번호  | 최소 8자, 특수문자 포함 | `password123!`       |
-| 생년월일  | YYYYMMDD 형식           | `19900101`           |
-| 리뷰 평점 | 0~5 사이 소수점 1자리   | `4`, `2.5`           |
-| 리뷰 내용 | 10~100자                | `좋은 요금제입니다!` |
+| 항목      | 검증 규칙                                            | 예시                 |
+| --------- | ---------------------------------------------------- | -------------------- |
+| 이메일    | 유효한 이메일 형식                                   | `user@example.com`   |
+| 휴대폰    | 10~11자리 숫자                                       | `01012345678`        |
+| 비밀번호  | **12~20자, 영문 대소문자+숫자+특수문자 각 1개 이상** | `MySecurePass123!`   |
+| 생년월일  | YYYYMMDD 형식, 유효한 날짜 검증                      | `19900101`           |
+| 리뷰 평점 | 0~5 사이 소수점 1자리                                | `4`, `2.5`           |
+| 리뷰 내용 | 10~100자                                             | `좋은 요금제입니다!` |
 
 ### 개발 가이드
 
@@ -1037,12 +1063,42 @@ document.getElementById("send-button").onclick = () => {
 
 ---
 
+## 🧪 테스트 & 개발 도구
+
+프로젝트에는 다양한 기능을 테스트할 수 있는 HTML 파일들이 포함되어 있습니다:
+
+### 🛠️ 개발 환경 설정
+
+```bash
+# 의존성 설치
+npm install
+
+# 환경 변수 설정 (.env 파일 생성 필요)
+PORT=3333
+DB_HOST=localhost
+CHATBOT_API=your_openai_api_key
+HTTPS_KEY=/path/to/private.key
+HTTPS_CERT=/path/to/certificate.crt
+
+# 서버 실행
+npm start  # 프로덕션
+npm run dev  # 개발 (nodemon)
+```
+
+---
+
 ## 📞 지원 정보
 
 - **API 버전**: v1.0.0
-- **문서 업데이트**: 2025년 06월
+- **서버 환경**: Node.js 16+, HTTPS 전용
+- **문서 업데이트**: 2025년 6월
 - **기술 지원**: 평일 09:00-18:00
 
 ---
 
-> 💡 **개발 팁**: 모든 API는 HTTPS 필수이며, 쿠키 기반 JWT 인증으로 보안이 강화되어 있습니다. WebSocket 연결은 자동 재연결 로직을 구현하는 것을 권장합니다.
+> 💡 **개발 팁**:
+>
+> - 모든 API는 HTTPS 필수이며, 쿠키 기반 JWT 인증으로 보안이 강화되어 있습니다
+> - WebSocket 연결은 자동 재연결 로직을 구현하는 것을 권장합니다
+> - 챗봇은 개인화된 응답을 위해 사용자 이메일 제공을 권장합니다
+> - 음성 기능 사용 시 마이크 권한이 필요합니다
