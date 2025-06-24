@@ -6,7 +6,7 @@
 
 - **Base URL**: `https://seungwoo.i234.me:3333`
 - **Protocol**: HTTPS Only (SSL/TLS 인증서 필수)
-- **Authentication**: JWT (Cookie-based, 30분 자동 갱신)
+- **Authentication**: JWT (HttpOnly Cookie, 30분 자동 갱신, 중복 로그인 방지)
 - **Content-Type**: `application/json`
 - **WebSocket**: `/realtime-chat` (GPT-4o 기반 AI 챗봇)
 - **Logging**: Winston (일별 로그 분리, 14일 보관)
@@ -71,7 +71,7 @@
 
 ```json
 {
-  "id": "user@example.com", // 이메일 또는 휴대폰
+  "id": "user@example.com", // 이메일 또는 휴대폰 번호
   "password": "password123!"
 }
 ```
@@ -81,18 +81,22 @@
 ```json
 {
   "success": true,
-  "id": 1,
-  "name": "홍길동",
-  "plan": 1,
-  "birthDay": "19900101",
   "message": "로그인에 성공했습니다."
 }
 ```
 
 **특징:**
 
-- JWT 토큰이 HttpOnly 쿠키로 자동 설정
-- 비밀번호 5회 이상 실패 시 계정 잠금
+- **JWT 토큰**: HttpOnly 쿠키로 자동 설정 (30분 만료)
+- **토큰 내용**: `{ email, id, name, plan, membership, birthDay }`
+- **중복 로그인 방지**: TOKEN 테이블 기반 관리
+- **계정 보안**: 비밀번호 5회 이상 실패 시 계정 잠금
+- **실패 카운트 초기화**: 성공 로그인 시 자동 리셋
+
+**Error Cases:**
+
+- `404`: "비밀번호 5회 이상 실패했습니다.\n비밀번호 재설정 후 다시 시도해주세요."
+- `404`: "로그인에 실패했습니다." (아이디/비밀번호 불일치)
 
 </details>
 
@@ -125,7 +129,7 @@
 <details>
 <summary><strong>POST /email</strong> - 인증코드 발송</summary>
 
-**설명**: 이메일로 4자리 인증코드를 발송합니다.
+**설명**: 이메일로 6자리 인증코드를 발송합니다.
 
 **Request:**
 
@@ -146,22 +150,24 @@
 
 **제한사항:**
 
-- 인증코드 유효시간: 5분
-- 보안 강화된 암호학적 난수 사용
+- **인증코드**: 6자리 숫자 (000000~999999)
+- **유효시간**: 5분
+- **보안**: 48비트 암호학적 난수 (`randomBytes(6)`) 사용
+- **Gmail SMTP**: 안전한 이메일 발송
 
 </details>
 
 <details>
 <summary><strong>POST /checkAuth</strong> - 인증코드 확인</summary>
 
-**설명**: 발송된 인증코드를 검증합니다.
+**설명**: 발송된 6자리 인증코드를 검증합니다.
 
 **Request:**
 
 ```json
 {
   "email": "user@example.com",
-  "auth": "1234"
+  "auth": "123456"
 }
 ```
 
@@ -173,6 +179,12 @@
   "message": "인증코드 인증 성공"
 }
 ```
+
+**특징:**
+
+- **유효성 검증**: 5분 이내, 미사용 인증코드만 유효
+- **일회성**: 인증 성공 시 `USE_NOT = "Y"`로 변경
+- **최신 코드**: 동일 이메일의 가장 최근 인증코드만 사용
 
 </details>
 
@@ -367,7 +379,7 @@
 <details>
 <summary><strong>POST /withDrawal</strong> - 회원 탈퇴</summary>
 
-**설명**: 계정 삭제 (개인정보 익명화 처리)
+**설명**: 계정 탈퇴 (개인정보 익명화 처리)
 
 **Request:**
 
@@ -389,15 +401,20 @@
 
 **특징:**
 
-- 개인정보 완전 익명화
-- JWT 토큰 자동 삭제
+- **개인정보 익명화**:
+  - 이메일, 비밀번호, 이름, 성별 → 빈 문자열
+  - 휴대폰 번호, 요금제, 실패 카운트 → 0
+  - 생년월일 → 해당 연도 1월 1일로 변경
+- **토큰 완전 삭제**: TOKEN 테이블에서 제거
+- **쿠키 삭제**: 브라우저에서 JWT 토큰 쿠키 자동 제거
+- **트랜잭션 처리**: 모든 작업을 원자적으로 실행
 
 </details>
 
 <details>
-<summary><strong>GET /tokenCheck</strong> - 토큰 검증 🔒</summary>
+<summary><strong>GET /tokenCheck</strong> - 토큰 검증 및 갱신 🔒</summary>
 
-**설명**: JWT 토큰 검증 및 자동 갱신
+**설명**: JWT 토큰 검증, 자동 갱신 및 중복 로그인 체크
 
 **Authentication**: Required (Cookie)
 
@@ -408,15 +425,29 @@
   "success": true,
   "authenticated": true,
   "user": {
-    "email": "user@example.com"
+    "email": "user@example.com",
+    "id": 1,
+    "name": "홍길동",
+    "plan": 1,
+    "membership": "VIP",
+    "birthDay": "1990-01-01T00:00:00.000Z"
   }
 }
 ```
 
 **특징:**
 
-- 토큰 자동 갱신 (30분)
-- 중복 로그인 방지
+- **자동 토큰 갱신**: 매 요청 시 30분 연장
+- **중복 로그인 방지**: TOKEN 테이블에서 현재 토큰 검증
+- **보안 강화**: 다른 곳에서 로그인 시 자동 로그아웃
+- **사용자 정보**: 토큰에서 디코딩된 모든 사용자 데이터 반환
+
+**Error Cases:**
+
+- `401`: "토큰이 없습니다."
+- `401`: "토큰 검증에 실패했습니다."
+- `401`: "다른 곳에서 로그인을 시도했습니다.\n안전을 위해 로그아웃 처리되었습니다."
+- `500`: "토큰 갱신 중 오류가 발생했습니다.\n안전을 위해 로그아웃 처리되었습니다."
 
 </details>
 
@@ -685,13 +716,15 @@
 
 **유효성 검증:**
 
-- `rating`: 0~5 사이의 값 (필수)
-- `review`: 10~100자 사이 (필수)
+- `rating`: 0~5 사이의 값 (필수) - 범위 벗어나면 404 에러
+- `review`: 10~100자 사이 (필수) - 범위 벗어나면 404 에러
 
 **특징:**
 
-- 요금제 평점 자동 업데이트
-- 리뷰 수 자동 증가
+- **요금제 평점 업데이트**: `RECEIVED_STAR_COUNT`에 새 평점 추가
+- **리뷰 수 증가**: `REVIEW_USER_COUNT` 자동 +1
+- **요금제 검증**: 존재하지 않는 요금제면 404 에러
+- **트랜잭션 처리**: 리뷰 생성과 평점 업데이트 원자적 실행
 
 </details>
 
@@ -721,7 +754,13 @@
 
 **특징:**
 
-- 요금제 평점 자동 재계산
+- **평점 재계산**: 기존 평점을 빼고 새 평점을 더해서 정확한 평점 유지
+- **유효성 검증**: 존재하는 리뷰만 수정 가능
+- **트랜잭션 처리**: 리뷰와 요금제 평점을 동시에 업데이트
+
+**Error Cases:**
+
+- `404`: "비정상적인 접근입니다." (존재하지 않는 리뷰)
 
 </details>
 
@@ -749,8 +788,14 @@
 
 **특징:**
 
-- 요금제 평점 자동 재계산
-- 리뷰 수 자동 감소
+- **평점 재계산**: `RECEIVED_STAR_COUNT`에서 삭제된 평점 차감
+- **리뷰 수 감소**: `REVIEW_USER_COUNT` 자동 -1
+- **유효성 검증**: 존재하는 리뷰와 요금제만 처리
+- **트랜잭션 처리**: 리뷰 삭제와 평점 업데이트 원자적 실행
+
+**Error Cases:**
+
+- `404`: "비정상적인 접근입니다." (존재하지 않는 리뷰 또는 요금제)
 
 </details>
 
@@ -766,7 +811,7 @@
 **Connection:**
 
 ```
-wss://yourdomain.com/realtime-chat?sessionId=123&email=user@example.com&history=true
+wss://seungwoo.i234.me:3333/realtime-chat?sessionId=123&email=user@example.com&history=true
 ```
 
 **Parameters:**
@@ -839,18 +884,29 @@ wss://yourdomain.com/realtime-chat?sessionId=123&email=user@example.com&history=
 
 ```json
 {
-  "success": true,
+  "totalConnections": 2,
   "connections": [
     {
-      "sessionId": "session_123",
-      "userEmail": "user@example.com",
-      "status": "connected",
-      "connectedAt": "2024-01-01T00:00:00.000Z"
+      "sessionId": "session_1640995200000_0.123456789",
+      "clientConnected": true,
+      "openaiConnected": true
+    },
+    {
+      "sessionId": "session_1640995300000_0.987654321",
+      "clientConnected": true,
+      "openaiConnected": false
     }
-  ],
-  "total": 1
+  ]
 }
 ```
+
+**응답 필드:**
+
+- `totalConnections`: 전체 활성 연결 수
+- `connections`: 각 연결의 상세 정보
+  - `sessionId`: 세션 고유 ID
+  - `clientConnected`: 클라이언트 WebSocket 연결 상태
+  - `openaiConnected`: OpenAI Realtime API 연결 상태
 
 </details>
 
@@ -890,12 +946,22 @@ wss://yourdomain.com/realtime-chat?sessionId=123&email=user@example.com&history=
 
 ### 보안 기능
 
-- 🔐 **JWT 토큰** (30분 자동 만료)
-- 🔒 **Argon2 해싱** (비밀번호 암호화)
-- 🛡️ **CORS 설정** (도메인 제한)
-- ✅ **SQL Injection 방지** (Prepared Statements)
-- 🚫 **Rate Limiting** (5회 실패 시 계정 잠금)
-- 🔍 **입력값 검증** (모든 API 파라미터)
+- 🔐 **JWT 토큰 관리**:
+  - HttpOnly 쿠키 기반 (XSS 공격 방지)
+  - 30분 자동 만료 및 갱신
+  - TOKEN 테이블 기반 중복 로그인 방지
+- 🔒 **Argon2 비밀번호 해싱**:
+  - Argon2id 알고리즘 사용
+  - 환경변수 기반 보안 파라미터 조정
+- 🛡️ **CORS 보안**:
+  - 허용된 도메인만 접근 가능
+  - `credentials: true` 설정
+- ✅ **SQL Injection 방지**: Prepared Statements 사용
+- 🚫 **계정 보안**:
+  - 비밀번호 5회 실패 시 계정 잠금
+  - 성공 로그인 시 실패 카운트 자동 리셋
+- 🔍 **입력값 검증**: 모든 API 파라미터 형식 검증
+- 🎯 **AI 챗봇 보안**: 메시지 필터링 시스템
 
 ### 데이터 유효성 검증
 
