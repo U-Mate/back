@@ -71,6 +71,20 @@ const updateReview = async (req, res) => {
     await conn.beginTransaction();
 
     try {
+        if(rating < 0 || rating > 5){
+            await conn.rollback();
+            conn.release();
+            logger.error("리뷰 평점은 0~5 사이의 값이어야 합니다.");
+            return res.status(404).json({success : false, error : "비정상적인 접근입니다."});
+        }
+
+        if(review.length < 10 || review.length > 100){
+            await conn.rollback();
+            conn.release();
+            logger.error("리뷰 내용은 10~100자 사이의 값이어야 합니다.");
+            return res.status(404).json({success : false, error : "비정상적인 접근입니다."});
+        }
+
         const [reviews] = await conn.query('SELECT * FROM PLAN_REVIEW WHERE REVIEW_ID = ?', [reviewId]);
 
         if(reviews.length === 0){

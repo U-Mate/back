@@ -15,16 +15,12 @@ const realtime = (clientWs, req) => {
   logger.info(`🔗 새로운 Realtime 연결: ${sessionId}, 사용자: ${userEmail || '게스트'}`);
 
   // OpenAI Realtime API 연결
-  logger.info(`🔑 OpenAI API 키 확인: ${process.env.CHATBOT_API ? '설정됨' : '없음'}`);
-  
   const openaiWs = new WebSocket('wss://api.openai.com/v1/realtime?model=gpt-4o-mini-realtime-preview-2024-12-17', {
     headers: {
       'Authorization': `Bearer ${process.env.CHATBOT_API}`,
       'OpenAI-Beta': 'realtime=v1'
     }
   });
-  
-  logger.info(`🌐 OpenAI WebSocket 생성됨: ${sessionId}`);
 
   // 연결 저장 (텍스트→오디오 모드 상태 포함)
   userConnections.set(sessionId, { 
@@ -41,25 +37,17 @@ const realtime = (clientWs, req) => {
     sessionId: sessionId
   }));
 
-  // 🚨 클라이언트 메시지 핸들러를 여기로 이동 (OpenAI 연결과 독립적으로 작동)
-  logger.info(`🎧 클라이언트 메시지 핸들러 등록 중... (세션: ${sessionId})`);
-  
   // 클라이언트로부터 메시지 수신
   clientWs.on('message', async (message) => {
-    logger.info(`📨 클라이언트로부터 메시지 수신 (세션: ${sessionId}):`, message.toString());
     try {
       const data = JSON.parse(message);
       
       switch (data.type) {
         case 'user_message':
-          logger.info(`📥 사용자 메시지 수신 (세션: ${sessionId}): "${data.message}"`);
-          
           // 🔥 메시지 필터링 적용
           const filterResult = filterMessage(data.message);
           
           if (!filterResult.allowed) {
-            logger.info(`🚫 메시지 차단됨: ${filterResult.reason} - "${data.message}"`);
-            
             // 필터링된 메시지에 대한 응답을 클라이언트에 전송
             clientWs.send(JSON.stringify({
               type: 'filtered_message',
@@ -77,13 +65,8 @@ const realtime = (clientWs, req) => {
               filtered: true
             }));
             
-            // 🚫 필터링된 메시지는 DB에 저장하지 않음
-            logger.info(`🗑️ 필터링된 메시지 DB 저장 건너뜀`);
-            
             return; // 더 이상 처리하지 않고 종료
           }
-          
-          logger.info(`✅ 메시지 필터링 통과: 관련성 점수 ${filterResult.relevanceScore}`);
           
           // 💾 사용자 메시지 히스토리 저장 (필터링 통과한 경우에만)
           if (userEmail) {
@@ -114,8 +97,6 @@ const realtime = (clientWs, req) => {
                 instructions: 'UMate 통신 서비스 관련 질문에만 답변하세요. 무관한 주제(양자역학, 요리, 영화 등)는 "죄송합니다. UMate 서비스 관련 질문만 답변드립니다"라고 응답하세요.'
               }
             }));
-
-            logger.info(`📤 OpenAI Realtime API로 메시지 전송: "${data.message}"`);
           } else {
             // Realtime API 연결이 안 된 경우 에러 처리
             logger.error('❌ OpenAI Realtime API 연결되지 않음');
@@ -178,8 +159,6 @@ const realtime = (clientWs, req) => {
             timestamp: new Date().toISOString()
           };
           
-          logger.info(`🔍 디버그 정보 요청 (세션: ${sessionId}):`, debugInfo);
-          
           clientWs.send(JSON.stringify({
             type: 'debug_response',
             serverStatus: debugInfo,
@@ -198,7 +177,8 @@ const realtime = (clientWs, req) => {
           break;
 
         default:
-          logger.info('알 수 없는 클라이언트 메시지 타입:', data.type);
+          // 알 수 없는 메시지 타입은 로그만 남기고 처리하지 않음
+          break;
       }
     } catch (error) {
       logger.error('클라이언트 메시지 파싱 오류:', error);
@@ -209,12 +189,9 @@ const realtime = (clientWs, req) => {
     }
   });
 
-  logger.info(`✅ 클라이언트 메시지 핸들러 등록 완료 (세션: ${sessionId})`);
-
   // OpenAI 연결 성공 시 세션 설정
   openaiWs.on('open', async () => {
     logger.info(`✅ OpenAI Realtime API 연결 성공: ${sessionId}`);
-    logger.info(`🔗 OpenAI WebSocket 상태: ${openaiWs.readyState} (OPEN=${openaiWs.OPEN})`);
     
     // 세션 설정 (음성 + 텍스트 지원)
     openaiWs.send(JSON.stringify({
@@ -290,27 +267,11 @@ const realtime = (clientWs, req) => {
     try {
       const event = JSON.parse(data.toString());
       
-      // 오디오 관련 이벤트는 더 상세히 로깅
-      if (event.type.includes('audio') || event.type === 'response.created' || event.type === 'response.done') {
-        logger.info(`📨 OpenAI 이벤트 수신 (상세): ${event.type} (세션: ${sessionId})`, {
-          type: event.type,
-          response_id: event.response_id || event.response?.id,
-          item_id: event.item_id,
-          delta_length: event.delta ? event.delta.length : undefined,
-          modalities: event.response?.modalities,
-          status: event.response?.status
-        });
-      } else {
-        logger.info(`📨 OpenAI 이벤트 수신: ${event.type} (세션: ${sessionId})`);
-      }
-      
       switch (event.type) {
         case 'session.created':
-          logger.info('Realtime 세션 생성됨');
           break;
 
         case 'session.updated':
-          logger.info('Realtime 세션 업데이트됨');
           break;
 
         case 'input_audio_buffer.speech_started':
@@ -332,20 +293,14 @@ const realtime = (clientWs, req) => {
         case 'conversation.item.input_audio_transcription.completed':
           // 음성 인식 완료
           const userTranscript = event.transcript;
-          logger.info(`🎤 음성 인식 결과 (${sessionId}): "${userTranscript}"`);
           
           // 🔥 음성 메시지도 필터링 적용 (음성용 관대한 기준)
           if (userTranscript) {
             // 음성의 경우 더 관대한 필터링 적용
-            logger.info(`🎤 음성 인식 결과 필터링 시작: "${userTranscript}"`);
-            
-            // 음성의 경우 기본적인 부적절성만 체크, 키워드 체크는 매우 완화
             const audioFilterResult = filterMessage(userTranscript, true); // isAudio = true
             
             // 음성인 경우 키워드 부족으로 인한 필터링은 무시 (부적절한 내용만 필터링)
             if (!audioFilterResult.allowed && audioFilterResult.type === 'inappropriate') {
-              logger.info(`🚫 음성 메시지 차단됨 (부적절한 내용): ${audioFilterResult.reason} - "${userTranscript}"`);
-              
               // 필터링된 음성 메시지 응답 전송
               clientWs.send(JSON.stringify({
                 type: 'filtered_message',
@@ -375,14 +330,6 @@ const realtime = (clientWs, req) => {
               
               return; // 더 이상 처리하지 않고 종료
             }
-            
-            // 🎤 음성의 경우 키워드 부족 등은 무시하고 통과시킴
-            if (!audioFilterResult.allowed && audioFilterResult.type !== 'inappropriate') {
-              logger.info(`🎤 음성 메시지 키워드 부족하지만 통과시킴: "${userTranscript}" (점수: ${audioFilterResult.score})`);
-              // 필터링하지 않고 계속 진행
-            } else if (audioFilterResult.allowed) {
-              logger.info(`✅ 음성 메시지 필터링 통과: 관련성 점수 ${audioFilterResult.relevanceScore || audioFilterResult.score}`);
-            }
           }
           
           // 💾 사용자 음성 메시지 히스토리 저장 (필터링과 상관없이 저장)
@@ -405,12 +352,6 @@ const realtime = (clientWs, req) => {
 
         case 'response.audio.delta':
           // 실시간 음성 스트리밍 - 클라이언트로 전송
-          logger.info(`🔊 오디오 델타 전송 (세션: ${sessionId}):`, {
-            deltaLength: event.delta ? event.delta.length : 0,
-            response_id: event.response_id,
-            item_id: event.item_id
-          });
-          
           clientWs.send(JSON.stringify({
             type: 'audio_delta',
             audio: event.delta,
@@ -457,12 +398,6 @@ const realtime = (clientWs, req) => {
 
         case 'response.created':
           // 실제 응답 생성 시작 (이전 대화 로드와 구분)
-          logger.info(`🤖 응답 생성 시작 (세션: ${sessionId}):`, {
-            response_id: event.response.id,
-            modalities: event.response.modalities || 'unknown',
-            output: event.response.output || 'unknown'
-          });
-          
           clientWs.send(JSON.stringify({
             type: 'assistant_message_start',
             message: '🤖 AI가 답변을 생성하고 있습니다...',
@@ -483,12 +418,6 @@ const realtime = (clientWs, req) => {
         case 'response.text.done':
           // 텍스트 완료
           const finalText = event.text;
-          const currentConn = userConnections.get(sessionId);
-          
-          logger.info(`📝 텍스트 응답 완료 (세션: ${sessionId}):`, {
-            textLength: finalText ? finalText.length : 0,
-            connectionExists: !!currentConn
-          });
           
           // 💾 AI 응답 히스토리 저장
           if (userEmail && finalText) {
@@ -505,14 +434,6 @@ const realtime = (clientWs, req) => {
 
         case 'response.done':
           // 응답 완료
-          logger.info(`✅ 응답 완료 (세션: ${sessionId}):`, {
-            response_id: event.response.id,
-            status: event.response.status,
-            status_details: event.response.status_details,
-            output: event.response.output ? Object.keys(event.response.output) : 'no output',
-            usage: event.response.usage
-          });
-          
           clientWs.send(JSON.stringify({
             type: 'response_complete',
             response: event.response
@@ -542,8 +463,6 @@ const realtime = (clientWs, req) => {
   // OpenAI 연결 오류
   openaiWs.on('error', (error) => {
     logger.error('❌ OpenAI Realtime API 연결 오류:', error);
-    logger.error('❌ 오류 상세:', error.message, error.code);
-    logger.error('❌ 전체 오류 객체:', JSON.stringify(error, null, 2));
     clientWs.send(JSON.stringify({
       type: 'error',
       error: `OpenAI 연결 오류: ${error.message || '알 수 없는 오류'}`
@@ -552,8 +471,7 @@ const realtime = (clientWs, req) => {
 
   // OpenAI 연결 종료
   openaiWs.on('close', (code, reason) => {
-    logger.info(`❌ OpenAI Realtime API 연결 종료: ${sessionId}`);
-    logger.info(`❌ 종료 코드: ${code}, 이유: ${reason}`);
+    logger.info(`❌ OpenAI Realtime API 연결 종료: ${sessionId} (코드: ${code})`);
     clientWs.send(JSON.stringify({
       type: 'connection',
       status: 'disconnected',
@@ -563,7 +481,7 @@ const realtime = (clientWs, req) => {
 
   // 클라이언트 연결 종료
   clientWs.on('close', (code, reason) => {
-    logger.info(`🔌 클라이언트 연결 종료: ${sessionId}, 코드: ${code}, 이유: ${reason}`);
+    logger.info(`🔌 클라이언트 연결 종료: ${sessionId}`);
     if (openaiWs.readyState === WebSocket.OPEN) {
       openaiWs.close();
     }

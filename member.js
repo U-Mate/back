@@ -108,16 +108,17 @@ const emailDuplicate = async (req, res) => {
 
     try {
         const [rows] = await db.query('SELECT * FROM USER WHERE EMAIL = ?', [email]);
-    } catch (error) {
-        
-    }
 
-    if(rows.length > 0){
-        logger.info(`${email}은 이미 존재하는 이메일입니다.`);
-        return res.status(404).json({success : false, error : "이미 존재하는 이메일입니다."});
-    }else{
-        logger.info(`${email}은 사용가능한 이메일입니다.`);
-        return res.status(200).json({success : true, message : "사용가능한 이메일입니다."});
+        if(rows.length > 0){
+            logger.info(`${email}은 이미 존재하는 이메일입니다.`);
+            return res.status(404).json({success : false, error : "이미 존재하는 이메일입니다."});
+        }else{
+            logger.info(`${email}은 사용가능한 이메일입니다.`);
+            return res.status(200).json({success : true, message : "사용가능한 이메일입니다."});
+        }
+    } catch (error) {
+        logger.error(error);
+        return res.status(500).json({success : false, error : "이메일 확인 중 오류가 발생했습니다."});
     }
 } 
 
@@ -269,6 +270,7 @@ const passwordReset = async (req, res) => {
         });
 
         await db.query('UPDATE USER SET PASSWORD = ? WHERE EMAIL = ?', [hashPassword, email]);
+        logger.info(`${email} 비밀번호 재설정 성공`);
         return res.status(200).json({success : true, message : "비밀번호 재설정 성공"});
     } catch (error) {
         logger.error(error);
@@ -296,6 +298,7 @@ const passwordCheck = async (req, res) => {
             return res.status(404).json({success : false, error : "일치하지 않습니다."});
         }
 
+        logger.info(`${email} 비밀번호 확인 성공`);
         return res.status(200).json({success : true, message : "비밀번호 확인 성공"});
     } catch (error) {
         logger.error(error);

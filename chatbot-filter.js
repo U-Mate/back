@@ -141,7 +141,6 @@ const checkServiceRelevance = (message, isAudio = false) => {
         } else {
             threshold = 2; // 긴 경우에만 2개 요구
         }
-        logger.info(`🎤 음성 메시지 기준: 길이 ${messageLength} → threshold ${threshold}`);
     } else {
         // 💬 텍스트의 경우 기존 기준 (조금 완화)
         if (messageLength < 5) {
@@ -151,7 +150,6 @@ const checkServiceRelevance = (message, isAudio = false) => {
         } else {
             threshold = 2; // 긴 메시지는 2개 요구 (완화)
         }
-        logger.info(`💬 텍스트 메시지 기준: 길이 ${messageLength} → threshold ${threshold}`);
     }
     
     return {
@@ -165,12 +163,9 @@ const checkServiceRelevance = (message, isAudio = false) => {
 
 // 🔍 종합 메시지 필터
 const filterMessage = (message, isAudio = false) => {
-    logger.info(`🔍 메시지 필터링 시작 (${isAudio ? '음성' : '텍스트'}): "${message}"`);
-    
     // 1. 부적절한 내용 체크
     const inappropriateCheck = checkInappropriateContent(message);
     if (inappropriateCheck.isInappropriate) {
-        logger.info(`🚫 부적절한 내용 감지: ${inappropriateCheck.detectedWord}`);
         return {
             allowed: false,
             reason: inappropriateCheck.reason,
@@ -185,7 +180,6 @@ const filterMessage = (message, isAudio = false) => {
     if (!relevanceCheck.isRelevant) {
         // 블랙리스트에 걸린 경우
         if (relevanceCheck.reason === 'blacklisted_topic') {
-            logger.info(`🚫 블랙리스트 주제 감지: ${relevanceCheck.detectedIrrelevantTopics.join(', ')}`);
             return {
                 allowed: false,
                 reason: '서비스와 무관한 주제',
@@ -196,7 +190,6 @@ const filterMessage = (message, isAudio = false) => {
         }
         // 키워드 부족으로 걸린 경우
         else {
-            logger.info(`📋 서비스 무관 메시지: 점수 ${relevanceCheck.score}/${relevanceCheck.threshold}`);
             return {
                 allowed: false,
                 reason: '서비스 키워드 부족',
@@ -208,7 +201,6 @@ const filterMessage = (message, isAudio = false) => {
         }
     }
     
-    logger.info(`✅ 메시지 필터링 통과: 관련성 점수 ${relevanceCheck.score}`);
     return {
         allowed: true,
         relevanceScore: relevanceCheck.score,
