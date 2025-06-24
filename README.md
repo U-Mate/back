@@ -314,10 +314,10 @@
 }
 ```
 
-**Error Codes:**
+**Error Cases:**
 
-- `404`: 이미 존재하는 이메일입니다.
-- `500`: 이메일 확인 중 오류가 발생했습니다.
+- `404`: "이미 존재하는 이메일입니다."
+- `500`: "이메일 확인 중 오류가 발생했습니다."
 
 </details>
 
@@ -473,7 +473,11 @@
       "PLAN_NAME": "청춘요금제",
       "MONTHLY_FEE": 35000,
       "CALL_INFO": "무제한",
+      "CALL_INFO_DETAIL": "",
+      "SMS_INFO": "무제한",
       "DATA_INFO": "10GB",
+      "DATA_INFO_DETAIL": "+무제한 제공",
+      "SHARE_DATA": "5GB",
       "AGE_GROUP": "20대",
       "USER_COUNT": 150,
       "RECEIVED_STAR_COUNT": 750,
@@ -505,7 +509,15 @@
       "PLAN_NAME": "청춘요금제",
       "MONTHLY_FEE": 35000,
       "CALL_INFO": "무제한",
-      "DATA_INFO": "10GB"
+      "CALL_INFO_DETAIL": "",
+      "SMS_INFO": "무제한",
+      "DATA_INFO": "10GB",
+      "DATA_INFO_DETAIL": "+무제한 제공",
+      "SHARE_DATA": "5GB",
+      "AGE_GROUP": "20대",
+      "USER_COUNT": 150,
+      "RECEIVED_STAR_COUNT": 750,
+      "REVIEW_USER_COUNT": 200
     },
     "benefits": [
       {
@@ -519,7 +531,9 @@
         "REVIEW_ID": 1,
         "USER_ID": 1,
         "STAR_RATING": 5,
-        "REVIEW_CONTENT": "정말 좋은 요금제입니다!"
+        "REVIEW_CONTENT": "정말 좋은 요금제입니다!",
+        "CREATED_AT": "2024-01-15T10:30:00.000Z",
+        "UPDATED_AT": "2024-01-15T10:30:00.000Z"
       }
     ]
   },
@@ -559,7 +573,7 @@
       "CALL_INFO": "무제한",
       "DATA_INFO": "10GB",
       "DATA_INFO_DETAIL": "+무제한 데이터 제공",
-      "SHARE_DATA": "Y",
+      "SHARE_DATA": "5GB",
       "AGE_GROUP": "20대"
     }
   ],
@@ -601,7 +615,7 @@
       "name": "청춘요금제",
       "monthlyFee": 35000,
       "dataInfo": "10GB",
-      "shareData": "Y",
+      "shareData": "5GB",
       "avgRating": 4.2,
       "reviewCount": 150
     }
@@ -760,7 +774,7 @@
 
 **Error Cases:**
 
-- `404`: "비정상적인 접근입니다." (존재하지 않는 리뷰)
+- `404`: "비정상적인 접근입니다." (리뷰 평점/내용 범위 초과, 존재하지 않는 리뷰)
 
 </details>
 
