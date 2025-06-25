@@ -6,10 +6,9 @@ const expressWs = require('express-ws');
 const cookieParser = require('cookie-parser');
 
 const app = express();
-expressWs(app);
 const cors = require("cors");
 
-const { signUp, phoneNumberDuplicate, emailAuth, checkAuth, getUserInfo, tokenCheck, logout, login, withDrawal, passwordChange, passwordReset, passwordCheck, phoneNumberCheck, authenticateToken } = require('./member');
+const { signUp, phoneNumberDuplicate, emailDuplicate, emailAuth, checkAuth, getUserInfo, tokenCheck, logout, login, withDrawal, passwordChange, passwordReset, passwordCheck, phoneNumberCheck, authenticateToken } = require('./member');
 const { realtime, connections } = require('./chatbot');
 const { getMyReview, createReview, updateReview, deleteReview } = require('./review');
 const { getPlanList, getPlanDetail, filterPlans, changeUserPlan, recommendPlansByAge } = require('./plan');
@@ -33,6 +32,12 @@ const options = {
     ca : fs.readFileSync(process.env.HTTPS_CA),
 };
 
+// HTTPS 서버 생성
+const server = https.createServer(options, app);
+
+// WebSocket을 HTTPS 서버에 연결
+expressWs(app, server);
+
 // chat bot
 app.ws('/realtime-chat', (clientWs, req) => realtime(clientWs, req));
 
@@ -47,6 +52,9 @@ app.post('/signUp', async (req, res) => await signUp(req, res));
 
 // 휴대폰 중복확인
 app.post('/duplicateCheck', async (req, res) => await phoneNumberDuplicate(req, res));
+
+// 이메일 중복확인
+app.post('/emailDuplicate', async (req, res) => await emailDuplicate(req, res));
 
 // 이메일 인증
 app.post('/email', async (req, res) => await emailAuth(req, res));
@@ -119,4 +127,4 @@ app.post('/changeUserPlan', async (req, res) => await changeUserPlan(req, res));
 // 요금제 추천
 app.post('/recommendPlansByAge', async (req, res) => await recommendPlansByAge(req, res));
 
-https.createServer(options, app).listen(process.env.PORT, () => logger.info("서버가 연결되었습니다."));
+server.listen(process.env.PORT, () => logger.info("서버가 연결되었습니다."));

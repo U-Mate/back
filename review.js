@@ -49,7 +49,7 @@ const createReview = async (req, res) => {
             return res.status(404).json({success : false, error : "비정상적인 접근입니다."});
         }
 
-        await conn.query('UPDATE PLAN_INFO SET RECEIVED_STAR_COUNT = ?, REVIEW_USER_COUNT = ? WHERE ID = ?', [rows[0].RECEIVED_STAR_COUNT + rating, rows[0].REVIEW_USER_COUNT + 1, planId]);
+        await conn.query('UPDATE PLAN_INFO SET RECEIVED_STAR_COUNT = ?, REVIEW_USER_COUNT = ? WHERE ID = ?', [Number(rows[0].RECEIVED_STAR_COUNT) + Number(rating), Number(rows[0].REVIEW_USER_COUNT) + 1, planId]);
 
         await conn.commit();
         conn.release();
@@ -71,6 +71,20 @@ const updateReview = async (req, res) => {
     await conn.beginTransaction();
 
     try {
+        if(rating < 0 || rating > 5){
+            await conn.rollback();
+            conn.release();
+            logger.error("리뷰 평점은 0~5 사이의 값이어야 합니다.");
+            return res.status(404).json({success : false, error : "비정상적인 접근입니다."});
+        }
+
+        if(review.length < 10 || review.length > 100){
+            await conn.rollback();
+            conn.release();
+            logger.error("리뷰 내용은 10~100자 사이의 값이어야 합니다.");
+            return res.status(404).json({success : false, error : "비정상적인 접근입니다."});
+        }
+
         const [reviews] = await conn.query('SELECT * FROM PLAN_REVIEW WHERE REVIEW_ID = ?', [reviewId]);
 
         if(reviews.length === 0){
@@ -82,7 +96,7 @@ const updateReview = async (req, res) => {
 
         await conn.query('UPDATE PLAN_REVIEW SET STAR_RATING = ?, REVIEW_CONTENT = ? WHERE REVIEW_ID = ?', [rating, review, reviewId]);
 
-        await conn.query('UPDATE PLAN_INFO SET RECEIVED_STAR_COUNT = ? WHERE ID = ?', [reviews[0].RECEIVED_STAR_COUNT - reviews[0].STAR_RATING + rating, reviews[0].PLAN_ID]);
+        await conn.query('UPDATE PLAN_INFO SET RECEIVED_STAR_COUNT = ? WHERE ID = ?', [Number(reviews[0].RECEIVED_STAR_COUNT) - Number(reviews[0].STAR_RATING) + Number(rating), reviews[0].PLAN_ID]);
 
         await conn.commit();
         conn.release();
@@ -125,7 +139,7 @@ const deleteReview = async (req, res) => {
             return res.status(404).json({success : false, error : "비정상적인 접근입니다."});
         }
 
-        await conn.query('UPDATE PLAN_INFO SET RECEIVED_STAR_COUNT = ?, REVIEW_USER_COUNT = ? WHERE ID = ?', [rows[0].RECEIVED_STAR_COUNT - reviews[0].STAR_RATING, rows[0].REVIEW_USER_COUNT - 1, reviews[0].PLAN_ID]);
+        await conn.query('UPDATE PLAN_INFO SET RECEIVED_STAR_COUNT = ?, REVIEW_USER_COUNT = ? WHERE ID = ?', [Number(rows[0].RECEIVED_STAR_COUNT) - Number(reviews[0].STAR_RATING), Number(rows[0].REVIEW_USER_COUNT) - 1, reviews[0].PLAN_ID]);
 
         await conn.commit();
         conn.release();

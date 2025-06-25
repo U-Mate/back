@@ -1,4 +1,4 @@
-const { db } = require("./db");
+const db = require("./db");
 const logger = require("./log");
 
 const saveChatHistory = async (email, messageType, message, audioData = null, contextInfo = null) => {
@@ -13,7 +13,6 @@ const saveChatHistory = async (email, messageType, message, audioData = null, co
 
         await conn.commit();
         conn.release();
-        logger.info("💾 채팅 히스토리 저장 완료");
         return true;
     } catch (error) {
         await conn.rollback();
@@ -33,7 +32,6 @@ const loadChatHistory = async (email) => {
             LIMIT 20
         `, [email]);
 
-        logger.info(`📖 채팅 히스토리 로드 완료: ${email} (${rows.length}개 메시지)`);
         return rows;
     } catch (error) {
         logger.error("❌ 채팅 히스토리 로드 오류:", error);
@@ -60,8 +58,6 @@ const loadServiceInfo = async () => {
                 return { ...plan, benefits };
             })
         );
-
-        logger.info(`✅ 모든 서비스 정보 로드 완료: ${services.length}개 요금제`);
 
         // 서비스 정보 텍스트 생성
         let serviceInfo = "\n\n=== UMate 서비스 정보 ===\n\n";
@@ -101,8 +97,6 @@ const loadServiceInfo = async () => {
 
         serviceInfo += "=== 서비스 정보 끝 ===\n\n";
         
-        logger.info(`📝 서비스 정보 텍스트 생성 완료: ${serviceInfo.length}자`);
-        
         return serviceInfo;
         
     } catch (error) {
@@ -113,7 +107,6 @@ const loadServiceInfo = async () => {
 
 const loadPreviousChatToOpenAI = async (openaiWs, email, history = null) => {
     try {
-        logger.info(`유저 정보 수집 시작 : ${email}`);
         if(email){
             const [userRows] = await db.query(`
                 SELECT *
@@ -126,7 +119,6 @@ const loadPreviousChatToOpenAI = async (openaiWs, email, history = null) => {
                 
                 // 🔥 서비스 정보도 함께 로드
                 const serviceInfo = await loadServiceInfo();
-                logger.info(serviceInfo);
                 
                 // 유저 정보 + 서비스 정보를 함께 전송
                 openaiWs.send(JSON.stringify({
@@ -146,14 +138,9 @@ ${serviceInfo}
                         ]
                     },
                 }));
-        
-                logger.info(`✅ 유저 정보 + 서비스 정보 수집 완료 : ${user.NAME} (${user.EMAIL})`);
             } else {
-                logger.info(`유저 정보 없음: ${email}`);
-                
                 // 유저 정보가 없어도 서비스 정보는 제공
                 const serviceInfo = await loadServiceInfo();
-                logger.info(serviceInfo);
 
                 openaiWs.send(JSON.stringify({
                     type: 'conversation.item.create',
@@ -172,15 +159,10 @@ ${serviceInfo}
                         ]
                     },
                 }));
-                
-                logger.info(`✅ 게스트 사용자용 서비스 정보 제공 완료`);
             }
         }else{
-            logger.info(`유저 정보 수집 완료 : 게스트`);
-            
             // 게스트 사용자에게도 서비스 정보 제공
             const serviceInfo = await loadServiceInfo();
-            logger.info(serviceInfo);
 
             openaiWs.send(JSON.stringify({
                 type: 'conversation.item.create',
@@ -199,20 +181,16 @@ ${serviceInfo}
                     ]
                 },
             }));
-            
-            logger.info(`✅ 게스트 사용자용 서비스 정보 제공 완료`);
         }
     } catch (error) {
         logger.error('❌ 유저 정보 수집 오류:', error);
     }
     
     try {
-        logger.info(`📚 이전 대화를 OpenAI conversation에 로드 시작: ${email}`);
-
+        // 🔥 회원: DB에서 로드, 비회원: sessionStorage에서 온 history 사용
         const chatHistory = email ? await loadChatHistory(email) : history;
 
         if(chatHistory && chatHistory.length > 0){
-            logger.info(`📖 ${chatHistory.length}개의 이전 메시지를 OpenAI에 추가`);
             chatHistory.forEach(msg => {
                 const isUser = msg.MESSAGE_TYPE === 'user';
                 const content = [];
@@ -221,7 +199,8 @@ ${serviceInfo}
                 if (msg.MESSAGE) {
                     content.push({
                         type: isUser ? 'input_text' : 'text',
-                        text: msg.MESSAGE
+                        text: msg.MESSAGE,
+                        time: msg.CREATED_AT
                     });
                 }
                 
@@ -229,22 +208,23 @@ ${serviceInfo}
                 if (msg.AUDIO_DATA) {
                     content.push({
                         type: isUser ? 'input_audio' : 'audio',
-                        audio: msg.AUDIO_DATA
+                        audio: msg.AUDIO_DATA,
+                        time: msg.CREATED_AT
                     });
                 }
                 
-                openaiWs.send(JSON.stringify({
-                    type: 'conversation.item.create',
-                    item: {
-                        type: 'message',
-                        role: isUser ? 'user' : 'assistant',
-                        content: content
-                    }
-                }));
+                // 빈 content 방지
+                if (content.length > 0) {
+                    openaiWs.send(JSON.stringify({
+                        type: 'conversation.item.create',
+                        item: {
+                            type: 'message',
+                            role: isUser ? 'user' : 'assistant',
+                            content: content
+                        }
+                    }));
+                }
             });
-            logger.info(`✅ 이전 대화 로드 완료: OpenAI가 이제 ${chatHistory.length}개 메시지의 컨텍스트를 기억함`);
-        }else{
-            logger.info(`📝 새로운 세션: 로드할 이전 대화가 없음`);
         }
     } catch (error) {
         logger.error('❌ 이전 대화 로드 오류:', error);

@@ -56,10 +56,20 @@ const signUp = async (req, res) => {
             parallelism : Number(process.env.PARALLELISM)
         });
 
-        await conn.query('INSERT INTO USER(NAME, GENDER, BIRTHDAY, PHONE_NUMBER, PHONE_PLAN, EMAIL, PASSWORD) VALUES(?, ?, ?, ?, ?, ?, ?)', [name, gender, birthDay, phoneNumber, phonePlan, email, hashPassword]);
+        const [planRows] = await conn.query('SELECT * FROM PLAN_INFO WHERE ID = ?', [phonePlan]);
+        if(planRows.length === 0){
+            await conn.rollback();
+            conn.release();
+            logger.error("존재하지 않는 요금제입니다.");
+            return res.status(404).json({success : false, error : "존재하지 않는 요금제입니다."});
+        }
 
-        const [rows] = await conn.query('SELECT * FROM PHONE_PLAN WHERE ID = ?', [phonePlan]);
-        await conn.query('UPDATE USER SET USER_COUNT = ? WHERE ID = ?', [rows[0].USER_COUNT + 1, phonePlan]);
+        const membership = planRows[0].MONTHLY_FEE >= 74800 ? `${planRows[0].MONTHLY_FEE >= 95000 ? "V" : ""}VIP` : "우수";
+
+        await conn.query('INSERT INTO USER(NAME, GENDER, BIRTHDAY, PHONE_NUMBER, PHONE_PLAN, MEMBERSHIP, EMAIL, PASSWORD) VALUES(?, ?, ?, ?, ?, ?, ?, ?)', [name, gender, birthDay, phoneNumber, phonePlan, membership, email, hashPassword]);
+
+        const [rows] = await conn.query('SELECT * FROM PLAN_INFO WHERE ID = ?', [phonePlan]);
+        await conn.query('UPDATE PLAN_INFO SET USER_COUNT = ? WHERE ID = ?', [rows[0].USER_COUNT + 1, phonePlan]);
         await conn.commit();
         conn.release();
         logger.info(`${email} 회원가입 성공`);
@@ -92,6 +102,26 @@ const phoneNumberDuplicate = async (req, res) => {
     }
 }
 
+// 이메일 중복확인
+const emailDuplicate = async (req, res) => {
+    const { email } = req.body;
+
+    try {
+        const [rows] = await db.query('SELECT * FROM USER WHERE EMAIL = ?', [email]);
+
+        if(rows.length > 0){
+            logger.info(`${email}은 이미 존재하는 이메일입니다.`);
+            return res.status(404).json({success : false, error : "이미 존재하는 이메일입니다."});
+        }else{
+            logger.info(`${email}은 사용가능한 이메일입니다.`);
+            return res.status(200).json({success : true, message : "사용가능한 이메일입니다."});
+        }
+    } catch (error) {
+        logger.error(error);
+        return res.status(500).json({success : false, error : "이메일 확인 중 오류가 발생했습니다."});
+    }
+} 
+
 // 이메일 인증
 const emailAuth = async (req, res) => {
     const { email } = req.body;
@@ -109,9 +139,9 @@ const emailAuth = async (req, res) => {
         // 보안 강화장치
         const buf = randomBytes(6); // 48비트 암호학적 난수 생성
         const num = buf.readUIntBE(0, 6) / 2**48;
-        const value = Math.floor(num * 10000);
+        const value = Math.floor(num * 1000000);
 
-        const auth = String(value).padStart(4, '0');
+        const auth = String(value).padStart(6, '0');
 
         await conn.query('INSERT INTO AUTHENTICATION(EMAIL, AUTH) VALUES(?, ?)', [email, auth]);
 
@@ -240,6 +270,7 @@ const passwordReset = async (req, res) => {
         });
 
         await db.query('UPDATE USER SET PASSWORD = ? WHERE EMAIL = ?', [hashPassword, email]);
+        logger.info(`${email} 비밀번호 재설정 성공`);
         return res.status(200).json({success : true, message : "비밀번호 재설정 성공"});
     } catch (error) {
         logger.error(error);
@@ -267,6 +298,7 @@ const passwordCheck = async (req, res) => {
             return res.status(404).json({success : false, error : "일치하지 않습니다."});
         }
 
+        logger.info(`${email} 비밀번호 확인 성공`);
         return res.status(200).json({success : true, message : "비밀번호 확인 성공"});
     } catch (error) {
         logger.error(error);
@@ -394,7 +426,7 @@ const login = async (req, res) => {
 
             await conn.query('UPDATE USER SET FAIL_CNT = ? WHERE EMAIL = ?', [0, email]);
 
-            const token = jwt.sign({email}, jwtSecret, {expiresIn : '30m'});
+            const token = jwt.sign({ email, id : rows[0].ID, name : rows[0].NAME, plan : rows[0].PHONE_PLAN, membership : rows[0].MEMBERSHIP, birthDay : rows[0].BIRTHDAY }, jwtSecret, {expiresIn : '30m'});
 
             await conn.query('INSERT INTO TOKEN(EMAIL, TOKEN) VALUES(?, ?) ON DUPLICATE KEY UPDATE TOKEN = ?', [email, token, token]);
 
@@ -410,7 +442,7 @@ const login = async (req, res) => {
             conn.release();
 
             logger.info(`${email} 로그인 성공`);
-            return res.status(200).json({success : true, id : rows[0].ID, name : rows[0].NAME, plan : rows[0].PHONE_PLAN, birthDay : rows[0].BIRTHDAY, message : "로그인에 성공했습니다."});
+            return res.status(200).json({success : true, message : "로그인에 성공했습니다."});
         }
     } catch (error) {
         await conn.rollback();
@@ -461,13 +493,13 @@ const logout = async (req, res) => {
 
 // 토큰 갱신
 const tokenCheck = async (req, res) => {
-    const email = { email : req.user.email };
+    const payload = { email : req.user.email, id : req.user.id, name : req.user.name, plan : req.user.plan, membership : req.user.membership, birthDay : req.user.birthDay };
 
     const conn = await db.getConnection();
     await conn.beginTransaction();
 
     try {
-        const [rows] = await conn.query('SELECT * FROM TOKEN WHERE EMAIL = ?', [email.email]);
+        const [rows] = await conn.query('SELECT * FROM TOKEN WHERE EMAIL = ?', [payload.email]);
 
         if(rows.length === 0){
             res.clearCookie('token', {
@@ -483,9 +515,9 @@ const tokenCheck = async (req, res) => {
             return res.status(404).json({success : false, error : "비정상적인 접근입니다."});
         }
 
-        const newToken = jwt.sign(email, jwtSecret, {expiresIn : '30m'});
+        const newToken = jwt.sign(payload, jwtSecret, {expiresIn : '30m'});
 
-        await conn.query('UPDATE TOKEN SET TOKEN = ? WHERE EMAIL = ?', [newToken, email.email]);
+        await conn.query('UPDATE TOKEN SET TOKEN = ? WHERE EMAIL = ?', [newToken, payload.email]);
 
         res.cookie('token', newToken, {
             httpOnly : true,
@@ -498,7 +530,7 @@ const tokenCheck = async (req, res) => {
         await conn.commit();
         conn.release();
 
-        logger.info(`${email.email} 토큰 갱신 성공`);
+        logger.info(`${payload.email} 토큰 갱신 성공`);
         return res.status(200).json({ success : true, authenticated : true, user : req.user });
     } catch (error) {
         res.clearCookie('token', {
@@ -590,4 +622,4 @@ const getUserInfo = async (req, res) => {
     }
 }
 
-module.exports = { signUp, phoneNumberDuplicate, emailAuth, checkAuth, passwordChange, passwordReset, passwordCheck, phoneNumberCheck, withDrawal, login, logout, tokenCheck, authenticateToken, getUserInfo };
+module.exports = { signUp, phoneNumberDuplicate, emailDuplicate, emailAuth, checkAuth, passwordChange, passwordReset, passwordCheck, phoneNumberCheck, withDrawal, login, logout, tokenCheck, authenticateToken, getUserInfo };
