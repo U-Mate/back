@@ -15,7 +15,7 @@
 
 - **종합 보안 시스템**: XSS, SQL 인젝션, CSRF, WebSocket 보안
 - **실시간 공격 탐지**: 35+ 패턴 기반 보안 위협 실시간 차단
-- **Rate Limiting**: IP당 15분 100회 제한, WebSocket 연결 제한
+- **Rate Limiting**: IP당 1분 100회 제한, WebSocket 연결 제한
 - **입력 검증**: DOMPurify, Validator.js 기반 다층 정화 시스템
 - **보안 헤더**: CSP, XSS-Protection, HSTS, Frame-Options 등
 - **CSRF 방지**: Double Submit Cookie 패턴, 토큰 기반 검증
@@ -26,10 +26,10 @@
 ## 📑 목차
 
 - [🛡️ 보안 시스템](#️-보안-시스템) (종합 보안 가이드)
-- [🔐 사용자 인증](#-사용자-인증) (14개 API)
+- [🔐 사용자 인증](#-사용자-인증) (15개 API)
 - [📱 요금제 관리](#-요금제-관리) (5개 API)
-- [⭐ 리뷰 시스템](#-리뷰-시스템) (4개 API)
-- [🤖 AI 챗봇](#-ai-챗봇) (WebSocket + API)
+- [⭐ 리뷰 시스템](#-리뷰-시스템) (5개 API)
+- [🤖 AI 챗봇](#-ai-챗봇) (WebSocket + 2개 API)
 - [📋 공통 정보](#-공통-정보)
 
 ---
@@ -80,8 +80,8 @@ admin'--
 # CSRF 토큰 발급
 GET /csrf-token
 
-# 보호된 API 요청
-POST /login
+# 보호된 API 요청 예시
+POST /passwordChange
 Headers: X-CSRF-Token: [토큰]
 ```
 
@@ -94,12 +94,12 @@ Headers: X-CSRF-Token: [토큰]
 
 ### 🛡️ 보안 미들웨어 적용 현황
 
-| API 카테고리    | XSS 방지 | SQL 인젝션 방지 | CSRF 방지      | Rate Limiting |
-| --------------- | -------- | --------------- | -------------- | ------------- |
-| **사용자 인증** | ✅       | ✅              | ✅             | ✅            |
-| **요금제 관리** | ✅       | ✅              | 🔸 읽기 전용   | ✅            |
-| **리뷰 시스템** | ✅       | ✅              | ✅             | ✅            |
-| **AI 챗봇**     | ✅       | ✅              | ✅ Origin 검증 | ✅            |
+| API 카테고리    | XSS 방지 | SQL 인젝션 방지 | CSRF 방지                      | Rate Limiting |
+| --------------- | -------- | --------------- | ------------------------------ | ------------- |
+| **사용자 인증** | ✅       | ✅              | 🔸 로그인/회원가입/재설정 제외 | ✅            |
+| **요금제 관리** | ✅       | ✅              | 🔸 읽기 전용 제외              | ✅            |
+| **리뷰 시스템** | ✅       | ✅              | 🔸 설문 제외                   | ✅            |
+| **AI 챗봇**     | ✅       | ✅              | ✅ Origin 검증                 | ✅            |
 
 ### 📊 보안 성능 지표
 
@@ -109,26 +109,24 @@ Headers: X-CSRF-Token: [토큰]
 - **실시간 로깅**: 모든 보안 이벤트 기록
 - **로그 최적화**: 불필요한 로그 제거로 성능 향상 (실시간 채팅 10x 최적화)
 
-### 🧪 보안 테스트 도구
+### 🧪 테스트 도구
 
-**xss-test.html** - 종합 보안 테스트 도구
+**test.html** - UMate AI 음성+텍스트 채팅 테스트 인터페이스
 
-- XSS 공격 시뮬레이션 (8가지 패턴)
-- SQL 인젝션 테스트 (6가지 패턴)
-- CSRF 공격 테스트 (3가지 시나리오)
-- WebSocket 보안 테스트
-- 실시간 방어 성공률 통계
+- 실시간 음성 인식 및 음성 응답 테스트
+- 텍스트 채팅 기능 테스트
+- WebSocket 연결 상태 모니터링
+- 다양한 AI 음성 스타일 테스트 (6가지)
+- 채팅 히스토리 관리 기능
+
+**접근 방법:**
 
 ```bash
-# 테스트 도구 접속
-https://seungwoo.i234.me:3333/xss-test.html
+# 로컬에서 파일 직접 열기 (정적 파일 제공 미설정)
+open public/test.html
 
-# 또는 로컬에서 실행
-# 1. 파일 다운로드
-curl -O https://seungwoo.i234.me:3333/xss-test.html
-
-# 2. 브라우저에서 열기
-open xss-test.html
+# 또는 브라우저에서 파일 경로로 직접 접근
+file:///path/to/UMate_Back/public/test.html
 ```
 
 ### 🔧 보안 설정
@@ -152,11 +150,11 @@ NODE_ENV=production   # 전체 보안 기능 활성화
 ### 회원가입 & 로그인
 
 <details>
-<summary><strong>POST /signUp</strong> - 회원가입 🛡️</summary>
+<summary><strong>POST /signUp</strong> - 회원가입</summary>
 
 **설명**: 새로운 사용자 계정을 생성합니다.
 
-**보안**: CSRF 토큰 필수, XSS/SQL 인젝션 방지
+**보안**: XSS/SQL 인젝션 방지 (계정 생성 과정)
 
 **Request:**
 
@@ -189,11 +187,11 @@ NODE_ENV=production   # 전체 보안 기능 활성화
 </details>
 
 <details>
-<summary><strong>POST /login</strong> - 로그인 🛡️</summary>
+<summary><strong>POST /login</strong> - 로그인</summary>
 
 **설명**: 사용자 로그인 (이메일 또는 휴대폰 번호)
 
-**보안**: CSRF 토큰 필수, XSS/SQL 인젝션 방지
+**보안**: XSS/SQL 인젝션 방지 (세션 생성 과정)
 
 **Request:**
 
@@ -355,11 +353,11 @@ NODE_ENV=production   # 전체 보안 기능 활성화
 </details>
 
 <details>
-<summary><strong>POST /passwordReset</strong> - 비밀번호 재설정 🛡️</summary>
+<summary><strong>POST /passwordReset</strong> - 비밀번호 재설정</summary>
 
 **설명**: 이메일 인증 후 비밀번호 재설정
 
-**보안**: CSRF 토큰 필수, XSS/SQL 인젝션 방지
+**보안**: XSS/SQL 인젝션 방지 (이메일 인증 기반 보안)
 
 **Request:**
 
@@ -1035,6 +1033,42 @@ fetch("/csrf-token", { credentials: "include" })
 
 </details>
 
+<details>
+<summary><strong>POST /survey</strong> - 설문 작성</summary>
+
+**설명**: 서비스 품질 향상을 위한 설문 응답을 제출합니다.
+
+**Request:**
+
+```json
+{
+  "rating": 5,
+  "content": "서비스가 정말 좋습니다! 앞으로도 계속 이용하겠습니다."
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "설문 작성 성공"
+}
+```
+
+**유효성 검증:**
+
+- `rating`: 평점 (숫자, 필수)
+- `content`: 설문 내용 (문자열, 필수)
+
+**특징:**
+
+- **익명 설문**: 사용자 인증 불필요
+- **트랜잭션 처리**: 데이터 무결성 보장
+- **로깅**: 모든 설문 응답 기록
+
+</details>
+
 ---
 
 ## 🤖 AI 챗봇
@@ -1145,6 +1179,41 @@ wss://seungwoo.i234.me:3333/realtime-chat?sessionId=123&email=user@example.com&h
   - `sessionId`: 세션 고유 ID
   - `clientConnected`: 클라이언트 WebSocket 연결 상태
   - `openaiConnected`: OpenAI Realtime API 연결 상태
+
+</details>
+
+<details>
+<summary><strong>POST /resetHistory</strong> - 대화 히스토리 초기화</summary>
+
+**설명**: 특정 사용자의 AI 챗봇 대화 히스토리를 초기화합니다.
+
+**Request:**
+
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "대화 히스토리가 초기화되었습니다."
+}
+```
+
+**특징:**
+
+- **개인정보 보호**: 사용자별 대화 히스토리 완전 삭제
+- **즉시 적용**: 다음 채팅 연결부터 새로운 대화 시작
+- **트랜잭션 처리**: 데이터 무결성 보장
+
+**Error Cases:**
+
+- `404`: "사용자를 찾을 수 없습니다."
+- `500`: "히스토리 초기화 중 오류가 발생했습니다."
 
 </details>
 
@@ -1395,7 +1464,9 @@ npm run dev  # 개발 (nodemon)
 ## 📞 지원 정보
 
 - **API 버전**: v1.0.0
+- **프로젝트**: UMate Backend Server - 요금제 추천 및 사용자 관리 시스템
 - **서버 환경**: Node.js 16+, HTTPS 전용
+- **주요 의존성**: Express 4.19.2, MySQL2 3.10.1, Winston 3.13.1, Argon2 1.8.3
 - **문서 업데이트**: 2025년 1월
 - **기술 지원**: 평일 09:00-18:00
 
