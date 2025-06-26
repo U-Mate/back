@@ -7,6 +7,10 @@
 const db = require("./db");
 const logger = require("./log");
 const { effectiveness } = require("./verification");
+const {
+  detectXSSAttempt,
+  detectSQLInjectionAttempt,
+} = require("./xss-protection");
 
 //  1) 전체 요금제 리스트 조회
 const getPlanList = async (req, res) => {
@@ -288,6 +292,7 @@ const changeUserPlan = async (req, res) => {
     const today = new Date();
     const birthDate = new Date(userRows[0].BIRTHDAY);
     const age = today.getFullYear() - birthDate.getFullYear();
+    console.log("내 나이는 : ", birthDay, age);
 
     switch (ageGroup) {
       case "만12세 이하":
@@ -304,7 +309,7 @@ const changeUserPlan = async (req, res) => {
         }
         break;
       case "만18세 이하":
-        if (age > 18 || age < 12) {
+        if (age > 18 || age <= 12) {
           await conn.rollback();
           conn.release();
           logger.error(
@@ -318,7 +323,7 @@ const changeUserPlan = async (req, res) => {
         }
         break;
       case "만34세 이하":
-        if (age > 34 || age < 18) {
+        if (age > 34 || age <= 18) {
           await conn.rollback();
           conn.release();
           logger.error(
@@ -393,6 +398,14 @@ const changeUserPlan = async (req, res) => {
 // 5) 연령대별 맞춤 요금제 조회
 const recommendPlansByAge = async (req, res) => {
   const { birthday } = req.body;
+
+  // 🛡️ XSS 및 SQL 인젝션 공격 탐지
+  if (detectXSSAttempt(birthday) || detectSQLInjectionAttempt(birthday)) {
+    logger.error("보안 위협이 감지되었습니다 - 나이별 요금제 추천 차단");
+    return res
+      .status(403)
+      .json({ success: false, error: "비정상적인 접근이 감지되었습니다." });
+  }
 
   if (!birthday) {
     logger.error("맞춤 요금제에 대한 비정상적인 접근입니다.");

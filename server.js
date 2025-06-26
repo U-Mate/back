@@ -53,6 +53,8 @@ const {
   setCSRFToken,
   safeSendJSON,
   setSecureCookie,
+  detectXSSAttempt,
+  detectSQLInjectionAttempt,
 } = require("./xss-protection");
 const { resetHistory } = require("./chatbot-history");
 

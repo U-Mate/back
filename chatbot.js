@@ -8,7 +8,11 @@ const {
   setUpContext,
 } = require("./chatbot-history");
 const { filterMessage } = require("./chatbot-filter");
-const { validateWebSocketMessage } = require("./xss-protection");
+const {
+  validateWebSocketMessage,
+  detectXSSAttempt,
+  detectSQLInjectionAttempt,
+} = require("./xss-protection");
 const logger = require("./log");
 
 // 사용자별 연결 저장
@@ -103,6 +107,27 @@ const realtime = (clientWs, req) => {
 
       switch (data.type) {
         case "user_message":
+          // 🛡️ 추가 보안 검증 (XSS 및 SQL 인젝션 탐지)
+          if (
+            detectXSSAttempt(data.message) ||
+            detectSQLInjectionAttempt(data.message)
+          ) {
+            logger.error("보안 위협이 감지되었습니다 - 챗봇 메시지 차단", {
+              sessionId,
+              userEmail: userEmail || "게스트",
+              message: data.message.substring(0, 50) + "...",
+            });
+
+            clientWs.send(
+              JSON.stringify({
+                type: "security_blocked",
+                error: "보안상 문제가 있는 메시지입니다. 다시 시도해주세요.",
+                blocked: true,
+              })
+            );
+            return;
+          }
+
           // 🔥 메시지 필터링 적용
           const filterResult = filterMessage(data.message);
 

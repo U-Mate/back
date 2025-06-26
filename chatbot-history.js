@@ -1,5 +1,9 @@
 const db = require("./db");
 const logger = require("./log");
+const {
+  detectXSSAttempt,
+  detectSQLInjectionAttempt,
+} = require("./xss-protection");
 
 const saveChatHistory = async (
   email,
@@ -329,6 +333,15 @@ const setUpContext = async (email) => {
 
 const resetHistory = async (req, res) => {
   const { email } = req.body;
+
+  // 🛡️ XSS 및 SQL 인젝션 공격 탐지
+  if (detectXSSAttempt(email) || detectSQLInjectionAttempt(email)) {
+    logger.error("보안 위협이 감지되었습니다 - 채팅 히스토리 초기화 차단");
+    return res
+      .status(403)
+      .json({ success: false, error: "비정상적인 접근이 감지되었습니다." });
+  }
+
   const conn = await db.getConnection();
   await conn.beginTransaction();
 

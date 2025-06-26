@@ -1,5 +1,9 @@
 const db = require("./db");
 const logger = require("./log");
+const {
+  detectXSSAttempt,
+  detectSQLInjectionAttempt,
+} = require("./xss-protection");
 
 // 내 리뷰 조회
 const getMyReview = async (req, res) => {
@@ -37,6 +41,16 @@ const createReview = async (req, res) => {
   await conn.beginTransaction();
 
   try {
+    // 🛡️ XSS 및 SQL 인젝션 공격 탐지
+    if (detectXSSAttempt(review) || detectSQLInjectionAttempt(review)) {
+      await conn.rollback();
+      conn.release();
+      logger.error("보안 위협이 감지되었습니다 - 리뷰 작성 차단");
+      return res
+        .status(403)
+        .json({ success: false, error: "비정상적인 접근이 감지되었습니다." });
+    }
+
     // 1. 리뷰 평점 검증
     if (rating < 0 || rating > 5) {
       await conn.rollback();
@@ -105,6 +119,16 @@ const updateReview = async (req, res) => {
   await conn.beginTransaction();
 
   try {
+    // 🛡️ XSS 및 SQL 인젝션 공격 탐지
+    if (detectXSSAttempt(review) || detectSQLInjectionAttempt(review)) {
+      await conn.rollback();
+      conn.release();
+      logger.error("보안 위협이 감지되었습니다 - 리뷰 수정 차단");
+      return res
+        .status(403)
+        .json({ success: false, error: "비정상적인 접근이 감지되었습니다." });
+    }
+
     if (rating < 0 || rating > 5) {
       await conn.rollback();
       conn.release();
@@ -223,6 +247,14 @@ const deleteReview = async (req, res) => {
 
 const survey = async (req, res) => {
   const { rating, content } = req.body;
+
+  // 🛡️ XSS 및 SQL 인젝션 공격 탐지
+  if (detectXSSAttempt(content) || detectSQLInjectionAttempt(content)) {
+    logger.error("보안 위협이 감지되었습니다 - 설문 작성 차단");
+    return res
+      .status(403)
+      .json({ success: false, error: "비정상적인 접근이 감지되었습니다." });
+  }
 
   const conn = await db.getConnection();
   await conn.beginTransaction();

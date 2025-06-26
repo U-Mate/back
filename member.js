@@ -1,3 +1,4 @@
+require("dotenv").config();
 const db = require("./db");
 const { randomInt, randomBytes } = require("crypto");
 
@@ -15,6 +16,8 @@ const {
   setSecureCookie,
   sanitizeHTML,
   escapeHTML,
+  detectXSSAttempt,
+  detectSQLInjectionAttempt,
 } = require("./xss-protection");
 
 const transporter = nodemailer.createTransport({
@@ -51,6 +54,21 @@ const signUp = async (req, res) => {
   await conn.beginTransaction();
 
   try {
+    // 🛡️ XSS 및 SQL 인젝션 공격 탐지
+    if (
+      detectXSSAttempt(name) ||
+      detectXSSAttempt(email) ||
+      detectSQLInjectionAttempt(name) ||
+      detectSQLInjectionAttempt(email)
+    ) {
+      await conn.rollback();
+      conn.release();
+      logger.error("보안 위협이 감지되었습니다 - 회원가입 차단");
+      return res
+        .status(403)
+        .json({ success: false, error: "비정상적인 접근이 감지되었습니다." });
+    }
+
     if (effectiveness(email, phoneNumber, birthDay, password)) {
       conn.release();
       logger.error("올바르지못한 형식");
@@ -82,8 +100,8 @@ const signUp = async (req, res) => {
     const ageGroup = planRows[0].AGE_GROUP;
 
     const today = new Date();
-    const birthDate = new Date(birthDay);
-    const age = today.getFullYear() - birthDate.getFullYear();
+    const birthDate = birthDay.substring(0, 4);
+    const age = today.getFullYear() - Number(birthDate);
 
     switch (ageGroup) {
       case "만12세 이하":
@@ -100,7 +118,7 @@ const signUp = async (req, res) => {
         }
         break;
       case "만18세 이하":
-        if (age > 18 || age < 12) {
+        if (age > 18 || age <= 12) {
           await conn.rollback();
           conn.release();
           logger.error(
@@ -114,7 +132,7 @@ const signUp = async (req, res) => {
         }
         break;
       case "만34세 이하":
-        if (age > 34 || age < 18) {
+        if (age > 34 || age <= 18) {
           await conn.rollback();
           conn.release();
           logger.error(
@@ -190,6 +208,14 @@ const signUp = async (req, res) => {
 const phoneNumberDuplicate = async (req, res) => {
   const { phoneNumber } = req.body;
 
+  // 🛡️ XSS 및 SQL 인젝션 공격 탐지
+  if (detectXSSAttempt(phoneNumber) || detectSQLInjectionAttempt(phoneNumber)) {
+    logger.error("보안 위협이 감지되었습니다 - 휴대폰 중복확인 차단");
+    return res
+      .status(403)
+      .json({ success: false, error: "비정상적인 접근이 감지되었습니다." });
+  }
+
   try {
     const [rows] = await db.query("SELECT * FROM USER WHERE PHONE_NUMBER = ?", [
       phoneNumber,
@@ -217,6 +243,14 @@ const phoneNumberDuplicate = async (req, res) => {
 // 이메일 중복확인
 const emailDuplicate = async (req, res) => {
   const { email } = req.body;
+
+  // 🛡️ XSS 및 SQL 인젝션 공격 탐지
+  if (detectXSSAttempt(email) || detectSQLInjectionAttempt(email)) {
+    logger.error("보안 위협이 감지되었습니다 - 이메일 중복확인 차단");
+    return res
+      .status(403)
+      .json({ success: false, error: "비정상적인 접근이 감지되었습니다." });
+  }
 
   try {
     const [rows] = await db.query("SELECT * FROM USER WHERE EMAIL = ?", [
@@ -250,6 +284,16 @@ const emailAuth = async (req, res) => {
   await conn.beginTransaction();
 
   try {
+    // 🛡️ XSS 및 SQL 인젝션 공격 탐지
+    if (detectXSSAttempt(email) || detectSQLInjectionAttempt(email)) {
+      await conn.rollback();
+      conn.release();
+      logger.error("보안 위협이 감지되었습니다 - 이메일 인증 차단");
+      return res
+        .status(403)
+        .json({ success: false, error: "비정상적인 접근이 감지되었습니다." });
+    }
+
     if (effectiveness(email, undefined, undefined, undefined)) {
       conn.release();
       logger.error("올바르지못한 형식");
@@ -294,6 +338,19 @@ const emailAuth = async (req, res) => {
 // 인증코드 인증
 const checkAuth = async (req, res) => {
   const { email, auth } = req.body;
+
+  // 🛡️ XSS 및 SQL 인젝션 공격 탐지
+  if (
+    detectXSSAttempt(email) ||
+    detectSQLInjectionAttempt(email) ||
+    detectXSSAttempt(auth) ||
+    detectSQLInjectionAttempt(auth)
+  ) {
+    logger.error("보안 위협이 감지되었습니다 - 인증번호 확인 차단");
+    return res
+      .status(403)
+      .json({ success: false, error: "비정상적인 접근이 감지되었습니다." });
+  }
 
   const conn = await db.getConnection();
   await conn.beginTransaction();
@@ -347,6 +404,14 @@ const checkAuth = async (req, res) => {
 // 비밀번호 변경
 const passwordChange = async (req, res) => {
   const { email, password, newPassword } = req.body;
+
+  // 🛡️ XSS 및 SQL 인젝션 공격 탐지
+  if (detectXSSAttempt(email) || detectSQLInjectionAttempt(email)) {
+    logger.error("보안 위협이 감지되었습니다 - 비밀번호 변경 차단");
+    return res
+      .status(403)
+      .json({ success: false, error: "비정상적인 접근이 감지되었습니다." });
+  }
 
   try {
     if (effectiveness(undefined, undefined, undefined, newPassword)) {
@@ -404,6 +469,14 @@ const passwordChange = async (req, res) => {
 const passwordReset = async (req, res) => {
   const { email, password } = req.body;
 
+  // 🛡️ XSS 및 SQL 인젝션 공격 탐지
+  if (detectXSSAttempt(email) || detectSQLInjectionAttempt(email)) {
+    logger.error("보안 위협이 감지되었습니다 - 비밀번호 재설정 차단");
+    return res
+      .status(403)
+      .json({ success: false, error: "비정상적인 접근이 감지되었습니다." });
+  }
+
   try {
     if (effectiveness(undefined, undefined, undefined, password)) {
       logger.error("올바르지못한 형식");
@@ -451,6 +524,14 @@ const passwordReset = async (req, res) => {
 const passwordCheck = async (req, res) => {
   const { email, password } = req.body;
 
+  // 🛡️ XSS 및 SQL 인젝션 공격 탐지
+  if (detectXSSAttempt(email) || detectSQLInjectionAttempt(email)) {
+    logger.error("보안 위협이 감지되었습니다 - 비밀번호 확인 차단");
+    return res
+      .status(403)
+      .json({ success: false, error: "비정상적인 접근이 감지되었습니다." });
+  }
+
   try {
     const [rows] = await db.query("SELECT * FROM USER WHERE EMAIL = ?", [
       email,
@@ -487,6 +568,14 @@ const passwordCheck = async (req, res) => {
 // 휴대폰 번호 확인
 const phoneNumberCheck = async (req, res) => {
   const { phoneNumber } = req.body;
+
+  // 🛡️ XSS 및 SQL 인젝션 공격 탐지
+  if (detectXSSAttempt(phoneNumber) || detectSQLInjectionAttempt(phoneNumber)) {
+    logger.error("보안 위협이 감지되었습니다 - 휴대폰 번호 확인 차단");
+    return res
+      .status(403)
+      .json({ success: false, error: "비정상적인 접근이 감지되었습니다." });
+  }
 
   try {
     const [rows] = await db.query("SELECT * FROM USER WHERE PHONE_NUMBER = ?", [
@@ -527,6 +616,14 @@ const phoneNumberCheck = async (req, res) => {
 // 회원탈퇴
 const withDrawal = async (req, res) => {
   const { email, password } = req.body;
+
+  // 🛡️ XSS 및 SQL 인젝션 공격 탐지
+  if (detectXSSAttempt(email) || detectSQLInjectionAttempt(email)) {
+    logger.error("보안 위협이 감지되었습니다 - 회원탈퇴 차단");
+    return res
+      .status(403)
+      .json({ success: false, error: "비정상적인 접근이 감지되었습니다." });
+  }
 
   const conn = await db.getConnection();
   await conn.beginTransaction();
@@ -589,6 +686,14 @@ const withDrawal = async (req, res) => {
 // 로그인
 const login = async (req, res) => {
   const { id, password } = req.body;
+
+  // 🛡️ XSS 및 SQL 인젝션 공격 탐지
+  if (detectXSSAttempt(id) || detectSQLInjectionAttempt(id)) {
+    logger.error("보안 위협이 감지되었습니다 - 로그인 차단");
+    return res
+      .status(403)
+      .json({ success: false, error: "비정상적인 접근이 감지되었습니다." });
+  }
 
   const conn = await db.getConnection();
   await conn.beginTransaction();
@@ -854,6 +959,14 @@ const authenticateToken = async (req, res, next) => {
 // 유저 상세 정보 조회
 const getUserInfo = async (req, res) => {
   const { email, password } = req.body;
+
+  // 🛡️ XSS 및 SQL 인젝션 공격 탐지
+  if (detectXSSAttempt(email) || detectSQLInjectionAttempt(email)) {
+    logger.error("보안 위협이 감지되었습니다 - 유저 정보 조회 차단");
+    return res
+      .status(403)
+      .json({ success: false, error: "비정상적인 접근이 감지되었습니다." });
+  }
 
   try {
     const [rows] = await db.query("SELECT * FROM USER WHERE EMAIL = ?", [
