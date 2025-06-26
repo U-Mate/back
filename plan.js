@@ -103,24 +103,48 @@ const getPlanDetail = async (req, res) => {
     // 리뷰 목록 조회
     const [reviews] = await conn.query(
       `SELECT
-         REVIEW_ID,
-         USER_ID,
-         STAR_RATING,
-         REVIEW_CONTENT,
-         CREATED_AT,
-         UPDATED_AT
-       FROM ChatBot.PLAN_REVIEW
-       WHERE PLAN_ID = ?
+         A.REVIEW_ID,
+         A.USER_ID,
+         B.NAME AS USER_NAME,
+         B.BIRTHDAY AS USER_BIRTHDAY,
+         A.STAR_RATING,
+         A.REVIEW_CONTENT,
+         A.CREATED_AT,
+         A.UPDATED_AT
+       FROM PLAN_REVIEW A
+       JOIN USER B ON A.USER_ID = B.ID
+       WHERE A.PLAN_ID = ?
        ORDER BY CREATED_AT DESC`,
       [planId]
     );
+
+    // 리뷰 작성자의 현재 나이 계산
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+
+    reviews.forEach((review) => {
+      if (review.USER_BIRTHDAY) {
+        const birthYear = new Date(review.USER_BIRTHDAY).getFullYear();
+
+        const age = currentYear - birthYear;
+
+        // 나이를 10대, 20대 형태로 변환
+        const ageGroup = Math.floor(age / 10) * 10;
+        review.USER_BIRTHDAY = ageGroup;
+      } else {
+        review.USER_BIRTHDAY = null;
+      }
+    });
 
     await conn.commit();
     conn.release();
 
     logger.info(`${planId} 요금제 상세 정보 조회 성공`);
-    return res.json({ success: true, data: { plan, benefits, reviews }, message : "요금제 상세 정보 조회 성공" });
-
+    return res.json({
+      success: true,
+      data: { plan, benefits, reviews },
+      message: "요금제 상세 정보 조회 성공",
+    });
   } catch (err) {
     logger.error(err);
 
@@ -154,7 +178,10 @@ const filterPlans = async (req, res) => {
         p.DATA_INFO,
         p.DATA_INFO_DETAIL,
         p.SHARE_DATA,
-        p.AGE_GROUP
+        p.AGE_GROUP,
+        p.USER_COUNT,
+        p.RECEIVED_STAR_COUNT,
+        p.REVIEW_USER_COUNT
       FROM ChatBot.PLAN_INFO p
     `;
     const params = [];
@@ -243,23 +270,30 @@ const changeUserPlan = async (req, res) => {
         .json({ success: false, error: "유저를 찾을 수 없습니다." });
     }
 
-    const [planRows] = await conn.query('SELECT * FROM PLAN_INFO WHERE ID = ?', [newPlanId]);
-    if(planRows.length === 0){
+    const [planRows] = await conn.query(
+      "SELECT * FROM PLAN_INFO WHERE ID = ?",
+      [newPlanId]
+    );
+    if (planRows.length === 0) {
       conn.release();
       logger.error("존재하지 않는 요금제입니다.");
-      return res.status(404).json({success : false, error : "존재하지 않는 요금제입니다."});
+      return res
+        .status(404)
+        .json({ success: false, error: "존재하지 않는 요금제입니다." });
     }
 
-    const membership = planRows[0].MONTHLY_FEE >= 74800 ? `${planRows[0].MONTHLY_FEE >= 95000 ? "V" : ""}VIP` : "우수";
+    const membership =
+      planRows[0].MONTHLY_FEE >= 74800
+        ? `${planRows[0].MONTHLY_FEE >= 95000 ? "V" : ""}VIP`
+        : "우수";
 
     const oldPlanId = userRows[0].PHONE_PLAN;
 
     // USER 테이블 업데이트
-    await conn.query(`UPDATE USER SET PHONE_PLAN = ?, MEMBERSHIP = ? WHERE ID = ?`, [
-      newPlanId,
-      membership,
-      userId,
-    ]);
+    await conn.query(
+      `UPDATE USER SET PHONE_PLAN = ?, MEMBERSHIP = ? WHERE ID = ?`,
+      [newPlanId, membership, userId]
+    );
 
     // PLAN_INFO에서 기존 요금제 USER_COUNT 감소
     if (oldPlanId) {
@@ -302,7 +336,7 @@ const recommendPlansByAge = async (req, res) => {
     });
   }
 
-  if(effectiveness(undefined, undefined, birthday, undefined)){
+  if (effectiveness(undefined, undefined, birthday, undefined)) {
     logger.error("생년월일 형식이 올바르지 않습니다.");
     return res.status(400).json({
       success: false,
@@ -310,7 +344,9 @@ const recommendPlansByAge = async (req, res) => {
     });
   }
 
-  const birthYear = new Date(birthday.replace(/(\d{4})(\d{2})(\d{2})/, "$1-$2-$3")).getFullYear();
+  const birthYear = new Date(
+    birthday.replace(/(\d{4})(\d{2})(\d{2})/, "$1-$2-$3")
+  ).getFullYear();
   const thisYear = new Date().getFullYear();
   const age = thisYear - birthYear;
   let ageGroup = Math.floor(age / 10) * 10;
