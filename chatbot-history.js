@@ -35,11 +35,15 @@ const loadChatHistory = async (email) => {
   try {
     const [rows] = await db.query(
       `
-            SELECT *
-            FROM CHAT_HISTORY
-            WHERE EMAIL = ?
-            ORDER BY ID ASC
-            LIMIT 20
+            SELECT * 
+            FROM (
+              SELECT *
+              FROM CHAT_HISTORY
+              WHERE EMAIL = ?
+              ORDER BY ID DESC
+              LIMIT 20
+            ) A
+            ORDER BY A.ID ASC
         `,
       [email]
     );
@@ -163,8 +167,9 @@ const loadPreviousChatToOpenAI = async (openaiWs, email, history = null) => {
     if (email) {
       const [userRows] = await db.query(
         `
-                SELECT *
-                FROM USER
+                SELECT *, B.NAME AS PLAN_NAME
+                FROM USER A
+                JOIN PLAN_INFO B ON A.PHONE_PLAN = B.ID
                 WHERE EMAIL = ?
                 `,
         [email]
@@ -186,7 +191,7 @@ const loadPreviousChatToOpenAI = async (openaiWs, email, history = null) => {
               content: [
                 {
                   type: "input_text",
-                  text: `사용자 정보: 이름 - ${user.NAME}, 이메일 - ${user.EMAIL}, 성별 - ${user.GENDER}, 생년월일 - ${user.BIRTHDAY}, 지금 사용 중인 요금제 - ${user.PHONE_PLAN}
+                  text: `사용자 정보: 이름 - ${user.NAME}, 이메일 - ${user.EMAIL}, 성별 - ${user.GENDER}, 생년월일 - ${user.BIRTHDAY}, 지금 사용 중인 요금제 - ${user.PLAN_NAME}
 
 ${serviceInfo}
 
@@ -322,9 +327,30 @@ const setUpContext = async (email) => {
   return context.join("\n");
 };
 
+const resetHistory = async (req, res) => {
+  const { email } = req.body;
+  const conn = await db.getConnection();
+  await conn.beginTransaction();
+
+  try {
+    await conn.query("DELETE FROM CHAT_HISTORY WHERE EMAIL = ?", [email]);
+
+    await conn.commit();
+    conn.release();
+    logger.info("✅ 채팅 히스토리 초기화 완료");
+    return res.status(200).json({ message: "채팅 히스토리 초기화 완료" });
+  } catch (error) {
+    await conn.rollback();
+    conn.release();
+    logger.error("❌ 채팅 히스토리 초기화 오류:", error);
+    return res.status(500).json({ message: "채팅 히스토리 초기화 실패" });
+  }
+};
+
 module.exports = {
   saveChatHistory,
   loadChatHistory,
   loadPreviousChatToOpenAI,
   setUpContext,
+  resetHistory,
 };

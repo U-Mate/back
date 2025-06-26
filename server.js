@@ -54,6 +54,7 @@ const {
   safeSendJSON,
   setSecureCookie,
 } = require("./xss-protection");
+const { resetHistory } = require("./chatbot-history");
 
 // 🛡️ 기본 보안 설정 (helmet)
 app.use(
@@ -116,6 +117,8 @@ expressWs(app, server);
 app.ws("/realtime-chat", (clientWs, req) => realtime(clientWs, req));
 
 app.get("/realtime-chat/connections", (req, res) => connections(req, res));
+
+app.post("/resetHistory", async (req, res) => await resetHistory(req, res));
 
 /**
  * 보안 관련

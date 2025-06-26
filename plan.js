@@ -27,7 +27,8 @@ const getPlanList = async (req, res) => {
         p.AGE_GROUP,
         p.USER_COUNT,
         p.RECEIVED_STAR_COUNT,
-        p.REVIEW_USER_COUNT
+        p.REVIEW_USER_COUNT,
+        p.CATEGORY
       FROM ChatBot.PLAN_INFO p
       ORDER BY p.ID
     `);
@@ -181,7 +182,8 @@ const filterPlans = async (req, res) => {
         p.AGE_GROUP,
         p.USER_COUNT,
         p.RECEIVED_STAR_COUNT,
-        p.REVIEW_USER_COUNT
+        p.REVIEW_USER_COUNT,
+        p.CATEGORY
       FROM ChatBot.PLAN_INFO p
     `;
     const params = [];
@@ -258,10 +260,9 @@ const changeUserPlan = async (req, res) => {
 
   try {
     // 현재 사용 중인 요금제 조회
-    const [userRows] = await conn.query(
-      `SELECT PHONE_PLAN FROM USER WHERE ID = ?`,
-      [userId]
-    );
+    const [userRows] = await conn.query(`SELECT * FROM USER WHERE ID = ?`, [
+      userId,
+    ]);
     if (!userRows.length) {
       conn.release();
       logger.error(`${userId} 유저를 찾을 수 없습니다.`);
@@ -280,6 +281,71 @@ const changeUserPlan = async (req, res) => {
       return res
         .status(404)
         .json({ success: false, error: "존재하지 않는 요금제입니다." });
+    }
+
+    const ageGroup = planRows[0].AGE_GROUP;
+
+    const today = new Date();
+    const birthDate = new Date(userRows[0].BIRTHDAY);
+    const age = today.getFullYear() - birthDate.getFullYear();
+
+    switch (ageGroup) {
+      case "만12세 이하":
+        if (age > 12) {
+          await conn.rollback();
+          conn.release();
+          logger.error(
+            "만12세 이하 요금제는 만12세 이하만 가입할 수 있습니다."
+          );
+          return res.status(404).json({
+            success: false,
+            error: "만12세 이하 요금제는 만12세 이하만 가입할 수 있습니다.",
+          });
+        }
+        break;
+      case "만18세 이하":
+        if (age > 18 || age < 12) {
+          await conn.rollback();
+          conn.release();
+          logger.error(
+            "만18세 이하 요금제는 만12세 초과 만18세 이하 청소년만 가입할 수 있습니다."
+          );
+          return res.status(404).json({
+            success: false,
+            error:
+              "만18세 이하 요금제는 만12세 초과 만18세 이하 청소년만 가입할 수 있습니다.",
+          });
+        }
+        break;
+      case "만34세 이하":
+        if (age > 34 || age < 18) {
+          await conn.rollback();
+          conn.release();
+          logger.error(
+            "만34세 이하 요금제는 만18세 초과 만34세 이하 성인만 가입할 수 있습니다."
+          );
+          return res.status(404).json({
+            success: false,
+            error:
+              "만34세 이하 요금제는 만18세 초과 만34세 이하 성인만 가입할 수 있습니다.",
+          });
+        }
+        break;
+      case "만65세 이상":
+        if (age < 65) {
+          await conn.rollback();
+          conn.release();
+          logger.error(
+            "만65세 이상 요금제는 만65세 이상만 가입할 수 있습니다."
+          );
+          return res.status(404).json({
+            success: false,
+            error: "만65세 이상 요금제는 만65세 이상만 가입할 수 있습니다.",
+          });
+        }
+        break;
+      default:
+        break;
     }
 
     const membership =
