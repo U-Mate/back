@@ -292,7 +292,6 @@ const changeUserPlan = async (req, res) => {
     const today = new Date();
     const birthDate = new Date(userRows[0].BIRTHDAY);
     const age = today.getFullYear() - birthDate.getFullYear();
-    console.log("내 나이는 : ", birthDay, age);
 
     switch (ageGroup) {
       case "만12세 이하":
